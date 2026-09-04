@@ -51,18 +51,6 @@ function stamp(head, value) {
   )
 }
 
-function button(letter) {
-  const href = 'mailto:' + letter.email + '?subject=' + encodeURIComponent('Re: ' + letter.subject)
-  return (
-    '<table cellpadding="0" cellspacing="0" role="presentation" align="center" style="margin:0 auto;"><tr>' +
-    '<td bgcolor="#8cc93f" align="center" style="background:#8cc93f;' +
-    'background-image:linear-gradient(#bdec78,#8cc93f);border-radius:13px;border-bottom:5px solid #4f8a20;">' +
-    '<a href="' + shield(href) + '" style="display:block;padding:14px 36px;font:700 18px ' + FONT + ';' +
-    'letter-spacing:0.7px;color:#14260a;text-decoration:none;">Answer</a>' +
-    '</td></tr></table>'
-  )
-}
-
 function footer() {
   return (
     '<table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;"><tr>' +
@@ -114,7 +102,6 @@ export function mailHtml(letter) {
     field('Message', body, '') +
     stamp('Received', shield(letter.date)) +
     '</table></td></tr>' +
-    (letter.email ? '<tr><td align="center" style="padding:0 30px 28px;">' + button(letter) + '</td></tr>' : '') +
     '</table>' +
     footer() +
     '</td></tr></table></body></html>'

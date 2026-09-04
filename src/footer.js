@@ -104,7 +104,9 @@ function showContact(host) {
     <form class="form" novalidate>
       <label class="field">
         <span class="field-name"></span>
-        <select class="f-subject" name="subject">${SUBJECTS.map((id) => `<option value="${id}"></option>`).join('')}</select>
+        <span class="pick">
+          <select class="f-subject" name="subject">${SUBJECTS.map((id) => `<option value="${id}"></option>`).join('')}</select>
+        </span>
       </label>
       <label class="field">
         <span class="field-name"></span>
@@ -126,6 +128,7 @@ function showContact(host) {
 
   const form = body.querySelector('.form')
   const subject = body.querySelector('.f-subject')
+  const pick = body.querySelector('.pick')
   const mail = body.querySelector('.f-email')
   const message = body.querySelector('.f-message')
   const error = body.querySelector('.f-error')
@@ -134,6 +137,15 @@ function showContact(host) {
   const gate = body.querySelector('.f-gate')
   const seat = body.querySelector('.f-slot')
   const names = body.querySelectorAll('.field-name')
+
+  const shutPick = () => pick.classList.remove('on')
+  subject.addEventListener('mousedown', () => pick.classList.toggle('on'))
+  subject.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') pick.classList.toggle('on')
+    else shutPick()
+  })
+  subject.addEventListener('change', shutPick)
+  subject.addEventListener('blur', shutPick)
 
   let busy = false
   let ticker = null
