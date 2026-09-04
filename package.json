@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:y8": "vite build --mode y8 --outDir dist-y8",
+    "build:crazygames": "vite build --mode crazygames --outDir dist-crazygames",
     "preview": "vite preview",
     "server:dev": "wrangler dev",
     "server:deploy": "wrangler deploy"
