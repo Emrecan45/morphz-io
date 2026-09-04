@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1117" />
+    <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <meta
+      name="description"
+      content="3D multiplayer evolution .io game. Eat to grow, pick your next shape and climb the leaderboard. Free in your browser, no download."
+    />
+    <title>morphz.io</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="morphz.io" />
+    <meta property="og:url" content="https://morphz.io/" />
+    <meta property="og:title" content="morphz.io" />
+    <meta
+      property="og:description"
+      content="3D multiplayer evolution .io game. Eat to grow, pick your next shape and climb the leaderboard. Free in your browser, no download."
+    />
+    <meta property="og:image" content="https://morphz.io/cover.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A red Colossus standing over a blue Grub in the Core." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="morphz.io" />
+    <meta
+      name="twitter:description"
+      content="3D multiplayer evolution .io game. Eat to grow, pick your next shape and climb the leaderboard. Free in your browser, no download."
+    />
+    <meta name="twitter:image" content="https://morphz.io/cover.jpg" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #1e2c25;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        background: #1e2c25;
+        transition: opacity 0.28s ease;
+      }
+      #boot.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="game">
+      <canvas id="canvas"></canvas>
+      <div id="boot"></div>
+      <div id="layer"></div>
+    </div>
+    <div id="crash"></div>
+    <script>
+      (function () {
+        var box = document.getElementById('crash')
+        var host = location.hostname
+        var local = host === 'localhost' || host === '127.0.0.1' || host === ''
+        function show(title, detail) {
+          if (local) {
+            box.style.cssText =
+              'position:fixed;inset:0;z-index:99;padding:24px;overflow:auto;background:#0a0e13;' +
+              'color:#ff8f8f;font:13px/1.6 Consolas,monospace;white-space:pre-wrap'
+            box.textContent = title + '\n\n' + detail
+            return
+          }
+          box.style.cssText =
+            'position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;' +
+            'padding:24px;text-align:center;background:#1e2c25;color:#e8f2ea;font:16px/1.6 system-ui,sans-serif'
+          box.textContent = title
+        }
+        window.addEventListener('error', function (e) {
+          var source = e.filename || ''
+          if (source.indexOf('challenges.cloudflare.com') >= 0) return
+          if (!source && e.message === 'Script error.') return
+          var stack = (e.error && e.error.stack) || ''
+          show(
+            'The game failed to start. Please reload the page.',
+            (e.message || e.error || 'unknown error') +
+              '\n' +
+              (e.filename || '') +
+              ':' +
+              (e.lineno || '') +
+              '\n\n' +
+              stack
+          )
+        })
+        window.addEventListener('unhandledrejection', function (e) {
+          if (!local) return
+          var r = e.reason
+          show('Promise rejected.', (r && (r.stack || r.message)) || String(r))
+        })
+      })()
+    </script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

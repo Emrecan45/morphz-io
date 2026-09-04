@@ -1,0 +1,24 @@
+{
+  "name": "morphz-io",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:y8": "vite build --mode y8 --outDir dist-y8",
+    "build:crazygames": "vite build --mode crazygames --outDir dist-crazygames",
+    "preview": "vite preview",
+    "server:dev": "wrangler dev",
+    "server:deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "wrangler": "^4.125.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260820.1": true
+  }
+}
