@@ -579,12 +579,6 @@ export function createMatch(mode, options) {
       hooks.onRoster()
       return true
     },
-    grant(b, amount) {
-      if (!b || !b.alive) return
-      addXp(b, amount)
-      applyMods(b)
-      b.hp = b.maxHp
-    },
     respawn(b, rebalance) {
       if (b && !b.alive) respawnHuman(b, rebalance)
     },

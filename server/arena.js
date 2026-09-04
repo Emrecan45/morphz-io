@@ -7,7 +7,7 @@ import {
   encodeShot,
   encodeFood,
 } from '../src/online.js'
-import { BOTS, UPGRADES, CREATURES, START, levelThreshold } from '../src/config.js'
+import { BOTS, UPGRADES, CREATURES, START } from '../src/config.js'
 
 const STEP = 1 / 30
 const SILENCE_MAX = 15000
@@ -370,13 +370,6 @@ export class Arena {
       p.pickShape(card.being, data)
       return
     }
-    if (type === 'cheat') {
-      if (this.env.CHEATS !== '1') return
-      const target = levelThreshold(UPGRADES.maxLevel - 1)
-      if (card.being.xp < target) p.grant(card.being, target - card.being.xp)
-      return
-    }
-
     if (type === 'respawn') {
       p.respawn(card.being, data === 1)
     }

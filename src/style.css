@@ -1698,8 +1698,8 @@ a.footer-author:hover {
 .ask-copy {
   margin: 0;
   font-size: 15px;
-  line-height: 1.55;
-  color: var(--soft);
+  line-height: 1.65;
+  color: #d3e0d5;
   text-align: center;
 }
 
@@ -1869,6 +1869,32 @@ a.footer-author:hover {
 
 .form select {
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 40px;
+}
+
+.pick {
+  position: relative;
+  display: block;
+}
+
+.pick::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  width: 13px;
+  height: 9px;
+  background: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.4 1.7 6 6.3l4.6-4.6' fill='none' stroke='%239db5a6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 13px 9px no-repeat;
+  transform: translateY(-50%);
+  transition: transform 0.16s ease;
+  pointer-events: none;
+}
+
+.pick.on::after {
+  transform: translateY(-50%) rotate(180deg);
 }
 
 .done {
@@ -1995,6 +2021,15 @@ a.footer-author:hover {
     padding: 8px 10px;
     font-size: 14px;
     border-radius: 10px;
+  }
+  .form select {
+    padding-right: 34px;
+  }
+  .pick::after {
+    right: 13px;
+    width: 12px;
+    height: 8px;
+    background-size: 12px 8px;
   }
   .form textarea {
     min-height: 0;

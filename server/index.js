@@ -116,7 +116,7 @@ function sameSecret(a, b) {
   return diff === 0
 }
 
-const MAIL_FROM = GAME_NAME + ' <onboarding@resend.dev>'
+const MAIL_FROM = GAME_NAME + ' <contact@morphz.io>'
 
 function parseFrom(value) {
   const pair = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(value)
@@ -164,7 +164,7 @@ async function handleContact(request, env) {
   const verdict = await checkToken(data && data.token, env, request.headers.get('cf-connecting-ip'), request)
   if (verdict === 'refused') return json({ ok: true })
 
-  if (!env.EMAIL && !env.RESEND_KEY) return json({ ok: false }, 500)
+  if (!env.RESEND_KEY) return json({ ok: false }, 500)
 
   const letter = {
     label: SUBJECT_LABELS[key],
@@ -187,26 +187,7 @@ async function handleContact(request, env) {
 async function postMail(env, letter, copy) {
   const from = parseFrom(env.MAIL_FROM || MAIL_FROM)
   const to = env.MAIL_TO || ''
-  if (!to) return false
-
-  if (env.EMAIL) {
-    try {
-      await env.EMAIL.send({
-        to,
-        cc: copy ? [letter.email] : undefined,
-        from: { email: from.email, name: from.name },
-        replyTo: letter.email || undefined,
-        subject: letter.subject,
-        html: letter.html,
-        text: letter.text,
-      })
-      return true
-    } catch {
-      if (!env.RESEND_KEY) return false
-    }
-  }
-
-  if (!env.RESEND_KEY) return false
+  if (!to || !env.RESEND_KEY) return false
   try {
     const rep = await fetch('https://api.resend.com/emails', {
       method: 'POST',

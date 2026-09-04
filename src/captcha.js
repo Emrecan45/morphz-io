@@ -1,7 +1,6 @@
 import { onOwnSite } from './brand.js'
 
 const STORE_KEY = onOwnSite() ? import.meta.env.VITE_TURNSTILE_KEY || '' : ''
-const VERIF = import.meta.env.VITE_TURNSTILE_VERIFY || ''
 const SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 
 let loading = null
@@ -141,53 +140,17 @@ function dropHost(dead, api, widgetId) {
   else setTimeout(drop, 600)
 }
 
-async function validate(token) {
-  if (!VERIF) return token
-  try {
-    const rep = await fetch(VERIF, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: token }),
-    })
-    if (!rep.ok) return null
-    const data = await rep.json()
-    if (!data || !data.success) return null
-    return token
-  } catch {
-    return null
-  }
-}
-
 export async function verifyHuman(nest) {
   lastReason = ''
   if (!STORE_KEY) return 'local'
-  if (nest) {
-    const own = await getToken(nest)
-    if (!own) return null
-    const fine = await validate(own)
-    if (!fine) lastReason = 'server'
-    return fine
-  }
-  if (tokenReady && Date.now() - tokenDate < TOKEN_TTL) {
-    const v = tokenReady
-    const valid = await validate(v)
-    if (!valid) lastReason = 'server'
-    return valid
-  }
+  if (nest) return getToken(nest)
+  if (tokenReady && Date.now() - tokenDate < TOKEN_TTL) return tokenReady
   if (pendingToken) {
     const v = await pendingToken
     tokenReady = null
-    if (v) {
-      const valid = await validate(v)
-      if (!valid) lastReason = 'server'
-      return valid
-    }
+    if (v) return v
   }
-  const raw = await getToken()
-  if (!raw) return null
-  const valid = await validate(raw)
-  if (!valid) lastReason = 'server'
-  return valid
+  return getToken()
 }
 
 async function getToken(seat) {

@@ -8,10 +8,8 @@ globs = ["**/*.png"]
 fallthrough = true
 
 [vars]
-MAIL_FROM = "morphz.io <onboarding@resend.dev>"
-
-# [[send_email]]
-# name = "EMAIL"
+MAIL_FROM = "morphz.io <contact@morphz.io>"
+SITE_URL = "https://morphz.io"
 
 [[durable_objects.bindings]]
 name = "ARENA_DO"
