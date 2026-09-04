@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { ARENA, CAM, CAM_PULL, CAM_PITCH, UPGRADES, BUSHES, ZONE, GOLD, cssHex, teamLook } from './config.js'
+import { ARENA, CAM, CAM_PULL, CAM_PITCH, UPGRADES, BUSHES, ZONE, GOLD, CREATURES, cssHex, teamLook } from './config.js'
 import { createView, moveSun, makeBases, fadeBush, smoothGeo, stepSea } from './scene.js'
 import { buildStaticWorld } from './world/decor.js'
 import { outlineMaterial, SHOT_OUTLINE } from './outline.js'
@@ -14,7 +14,7 @@ import {
   foodColor,
   foodHeight,
 } from './food.js'
-import { t, onLanguage } from './i18n.js'
+import { t, onLanguage, suggestLanguage } from './i18n.js'
 import { openChoice } from './footer.js'
 import { networkAvailable, findRoom, connect, liveRooms, hasPass } from './net.js'
 import {
@@ -62,8 +62,21 @@ import {
   showPause,
   markLogoSeen,
 } from './hud.js'
-import { unlockAudio, toggleMute } from './audio.js'
+import { unlockAudio, toggleMute, musicMuted } from './audio.js'
 import { markTouch } from './quality.js'
+import {
+  initSdk,
+  loadingStart,
+  loadingStop,
+  gameplayStart,
+  gameplayStop,
+  happyTime,
+  adReady,
+  midgameAd,
+  portalLocale,
+  portalMuted,
+  onPortalSettings,
+} from './sdk.js'
 
 const layer = document.getElementById('layer')
 const canvas = document.getElementById('canvas')
@@ -462,6 +475,7 @@ function hushScene() {
 }
 
 let deathTimer = null
+let adHold = false
 
 function finishPlayer() {
   const p = game.player
@@ -494,14 +508,18 @@ function watchMatch(spot) {
     game.player.first = true
     if (hushTimer) clearTimeout(hushTimer)
     hushTimer = null
-    if (linked) {
-      net.socket.send('respawn', 0)
-      waitSpawn()
-      return
-    }
-    game.match.respawn(game.player, true)
-    snapCamera(game.player)
-    game.hud.el.classList.remove('faded')
+    breakForAd(() => {
+      if (!game.player) return
+      if (linked) {
+        if (!net.socket) return
+        net.socket.send('respawn', 0)
+        waitSpawn()
+        return
+      }
+      game.match.respawn(game.player, true)
+      snapCamera(game.player)
+      game.hud.el.classList.remove('faded')
+    })
     return
   }
   game.watching = true
@@ -830,6 +848,7 @@ function revealWorld() {
   if (holdForRotate()) return
   shown = true
   markLogoSeen()
+  loadingStop()
   document.body.classList.add('ready')
   const veil = document.getElementById('boot')
   if (!veil) return
@@ -854,6 +873,11 @@ function update(dt) {
 
 function frame(now) {
   if (!game.running || offScreen) return
+  if (adHold) {
+    last = now
+    requestAnimationFrame(frame)
+    return
+  }
   if (!warmed) {
     last = now
     requestAnimationFrame(frame)
@@ -886,6 +910,7 @@ function backRing() {
 function watchVisibility() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      gameplayStop()
       if (!offScreen) offScreen = setInterval(backRing, 33)
       return
     }
@@ -893,6 +918,7 @@ function watchVisibility() {
       clearInterval(offScreen)
       offScreen = null
     }
+    if (game.inGame && game.player) gameplayStart()
     last = performance.now()
     requestAnimationFrame(frame)
   })
@@ -915,6 +941,7 @@ function pickShape(id) {
     game.match.pickShape(p, id)
   }
   evolveFx(p, 1.35)
+  if (CREATURES[id] && CREATURES[id].tier >= 3) happyTime()
 }
 
 function raiseUpgrade(id) {
@@ -1341,6 +1368,8 @@ function togglePause(on) {
   if (!game.player || !game.running) return
   game.pause = on === undefined ? !game.pause : on
   showPause(game.hud, game.pause)
+  if (game.pause) gameplayStop()
+  else gameplayStart()
 }
 
 function setupHud() {
@@ -1411,10 +1440,12 @@ function enterGame(name, mode, token) {
     game.inGame = true
     game.player.first = true
     net.socket.send('respawn', 1)
+    gameplayStart()
     return waitSpawn()
   }
 
   game.inGame = true
+  gameplayStart()
   if (online) {
     game.hud.el.classList.add('faded')
     net.name = name
@@ -1483,9 +1514,61 @@ function quit(anchorAt) {
   } else pickAnchor()
   
   if (wasInGame) {
+    gameplayStop()
     if (manual) setTimeout(openMenu, 1500)
     else openMenu()
+    if (!manual) breakForAd()
   }
+}
+
+let adVeil = null
+let adVeilTimer = null
+
+function showAdWait() {
+  if (adVeil || adVeilTimer) return
+  adVeilTimer = setTimeout(() => {
+    adVeilTimer = null
+    if (adVeil) return
+    adVeil = document.createElement('div')
+    adVeil.className = 'adwait'
+    adVeil.innerHTML = '<div class="adwait-ring"></div><p class="adwait-text"></p>'
+    adVeil.querySelector('.adwait-text').textContent = t('adWait')
+    layer.appendChild(adVeil)
+  }, 250)
+}
+
+function hideAdWait() {
+  if (adVeilTimer) clearTimeout(adVeilTimer)
+  adVeilTimer = null
+  if (!adVeil) return
+  adVeil.remove()
+  adVeil = null
+}
+
+function breakForAd(after) {
+  const go = () => {
+    if (after) after()
+  }
+  if (!adReady()) {
+    go()
+    return
+  }
+  const quiet = musicMuted()
+  showAdWait()
+  midgameAd({
+    onStart: () => {
+      hideAdWait()
+      adHold = true
+      if (!quiet) toggleMute(true)
+    },
+    onDone: () => {
+      hideAdWait()
+      adHold = false
+      last = performance.now()
+      if (!quiet) toggleMute(false)
+      go()
+    },
+  })
 }
 
 function viewSpan() {
@@ -1695,8 +1778,19 @@ function armAudio() {
   unlockAudio()
 }
 
+function bootPortal() {
+  initSdk().then(() => {
+    loadingStart()
+    suggestLanguage(portalLocale())
+    if (portalMuted()) toggleMute(true)
+    onPortalSettings((s) => toggleMute(!!(s && s.muteAudio)))
+    if (shown) loadingStop()
+  })
+}
+
 markTouch()
 mountRotate()
 armAudio()
+bootPortal()
 buildWorld('solo')
 openMenu()

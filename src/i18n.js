@@ -13,6 +13,7 @@ const STRINGS = {
     online: 'En ligne',
     offline: 'Hors ligne',
     connection: 'Connexion au serveur...',
+    adWait: 'Chargement de la publicité...',
     search: 'Recherche d\'une partie...',
     roomJoined: 'Partie trouvée',
     connectionLost: 'Serveur injoignable, partie locale.',
@@ -126,6 +127,7 @@ const STRINGS = {
     online: 'Online',
     offline: 'Offline',
     connection: 'Connecting to the server...',
+    adWait: 'Loading advertisement...',
     search: 'Looking for a match...',
     roomJoined: 'Match found',
     connectionLost: 'Server unreachable, local match.',
@@ -239,6 +241,7 @@ const STRINGS = {
     online: 'En línea',
     offline: 'Sin conexión',
     connection: 'Conectando al servidor...',
+    adWait: 'Cargando publicidad...',
     search: 'Buscando partida...',
     roomJoined: 'Partida encontrada',
     connectionLost: 'Servidor inaccesible, partida local.',
@@ -352,6 +355,7 @@ const STRINGS = {
     online: 'Online',
     offline: 'Offline',
     connection: 'Verbinde mit dem Server...',
+    adWait: 'Werbung wird geladen...',
     search: 'Suche nach einer Partie...',
     roomJoined: 'Partie gefunden',
     connectionLost: 'Server nicht erreichbar, lokale Partie.',
@@ -465,6 +469,7 @@ const STRINGS = {
     online: 'Online',
     offline: 'Offline',
     connection: 'A ligar ao servidor...',
+    adWait: 'A carregar publicidade...',
     search: 'A procurar uma partida...',
     roomJoined: 'Partida encontrada',
     connectionLost: 'Servidor inacessível, partida local.',
@@ -578,6 +583,7 @@ const STRINGS = {
     online: 'Онлайн',
     offline: 'Оффлайн',
     connection: 'Подключение к серверу...',
+    adWait: 'Загрузка рекламы...',
     search: 'Поиск матча...',
     roomJoined: 'Матч найден',
     connectionLost: 'Сервер недоступен, локальный матч.',
@@ -691,6 +697,7 @@ const STRINGS = {
     online: 'Çevrimiçi',
     offline: 'Çevrimdışı',
     connection: 'Sunucuya bağlanılıyor...',
+    adWait: 'Reklam yükleniyor...',
     search: 'Maç aranıyor...',
     roomJoined: 'Maç bulundu',
     connectionLost: 'Sunucuya ulaşılamadı, yerel maç.',
@@ -803,11 +810,13 @@ export const LANGUAGES = [
 
 const STORE_KEY = 'morphz.lang'
 let currentLang = 'en'
+let picked = false
 
 try {
   const kept = localStorage.getItem(STORE_KEY)
   if (STRINGS[kept]) {
     currentLang = kept
+    picked = true
   } else if (navigator.language) {
     const nav = navigator.language.slice(0, 2).toLowerCase()
     if (STRINGS[nav]) currentLang = nav
@@ -830,6 +839,12 @@ export function setLanguage(id) {
   }
   document.documentElement.lang = id
   for (const fn of listeners) fn(id)
+}
+
+export function suggestLanguage(tag) {
+  if (picked || !tag) return
+  const id = String(tag).slice(0, 2).toLowerCase()
+  if (STRINGS[id]) setLanguage(id)
 }
 
 export function onLanguage(fn) {
