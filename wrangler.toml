@@ -1,0 +1,22 @@
+name = "morphz-io-arena"
+main = "server/index.js"
+compatibility_date = "2025-01-01"
+
+[[rules]]
+type = "Data"
+globs = ["**/*.png"]
+fallthrough = true
+
+[vars]
+MAIL_FROM = "morphz.io <onboarding@resend.dev>"
+
+# [[send_email]]
+# name = "EMAIL"
+
+[[durable_objects.bindings]]
+name = "ARENA_DO"
+class_name = "Arena"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Arena"]
