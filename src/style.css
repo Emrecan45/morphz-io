@@ -1698,8 +1698,8 @@ a.footer-author:hover {
 .ask-copy {
   margin: 0;
   font-size: 15px;
-  line-height: 1.55;
-  color: var(--soft);
+  line-height: 1.65;
+  color: #d3e0d5;
   text-align: center;
 }
 
