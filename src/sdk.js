@@ -19,14 +19,6 @@ export async function initSdk() {
   return portal.name
 }
 
-export function portalName() {
-  return portal.name
-}
-
-export function onPortal() {
-  return portal.isHost()
-}
-
 export function portalLocale() {
   return portal.locale()
 }

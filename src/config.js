@@ -1,5 +1,3 @@
-export const VERSION = '0.1.0-proto'
-
 export const ARENA = {
   half: 150,
   rings: [

@@ -1,5 +1,5 @@
 import { Arena } from './arena.js'
-import { BOTS, CREATURES, UPGRADES, START, TIER_LEVEL } from '../src/config.js'
+import { BOTS } from '../src/config.js'
 import { GAME_NAME } from '../src/brand.js'
 import { SUBJECT_LABELS, mailHtml, mailText } from './mail.js'
 import LOGO_PNG from './logo.png'
@@ -263,6 +263,16 @@ function addMeta(into, part) {
   }
 }
 
+const ADMIN_WAIT = 1500
+
+async function adminAllowed(request, env) {
+  const wanted = env.ADMIN_PIN || ''
+  const given = new URL(request.url).searchParams.get('pin') || ''
+  if (wanted && sameSecret(wanted, given)) return true
+  await new Promise((wake) => setTimeout(wake, ADMIN_WAIT))
+  return false
+}
+
 async function adminStats(env) {
   const jobs = []
   for (const mode of ['solo', 'team']) {
@@ -284,52 +294,6 @@ async function adminStats(env) {
   }
   const all = answers.filter((r) => r.running || r.joins > 0)
   return json({ at: Date.now(), scanned: ADMIN_SCAN * 2, cap: BOTS.population, rooms: all, meta })
-}
-
-function adminCreatures() {
-  const list = []
-  for (const id of Object.keys(CREATURES)) {
-    const c = CREATURES[id]
-    const shot = c.shot || {}
-    const burstSize = shot.pattern === 'burst' ? shot.burst || 3 : 1
-    const volley = (shot.nb || 1) * burstSize
-    const perShot = Math.round(c.damage * (shot.power || 1))
-    list.push({
-      id,
-      name: c.name,
-      role: c.role || '',
-      tier: c.tier,
-      branch: c.branch,
-      size: c.size,
-      hp: c.hp,
-      speed: c.speed,
-      damage: c.damage,
-      perShot,
-      range: c.range,
-      cooldown: c.cooldown,
-      dps: Math.round(((perShot * volley) / c.cooldown) * 10) / 10,
-      pattern: shot.pattern || 'bolt',
-      volley,
-      burst: burstSize,
-      nb: shot.nb || 1,
-      bulletSpeed: shot.speed || 0,
-      hull: shot.hull || 1,
-      through: shot.through || 0,
-      spread: shot.spread || 0,
-      poison: c.poison ? c.poison.dps + ' dps x ' + c.poison.duration + ' s' : '',
-      value: c.value,
-      color: '#' + c.color.toString(16).padStart(6, '0'),
-      next: c.next || [],
-    })
-  }
-  return json({
-    at: Date.now(),
-    start: START,
-    tierLevel: TIER_LEVEL,
-    upgrades: UPGRADES.list.map((u) => ({ id: u.id, name: u.name, step: u.step })),
-    max: UPGRADES.max,
-    creatures: list,
-  })
 }
 
 function stub(env, mode, room) {
@@ -374,11 +338,8 @@ export default {
     }
 
     if (url.pathname === '/admin/stats') {
+      if (!(await adminAllowed(request, env))) return json({ error: 'pin' }, 403)
       return adminStats(env)
-    }
-
-    if (url.pathname === '/admin/creatures') {
-      return adminCreatures()
     }
 
     if (url.pathname === '/play') {

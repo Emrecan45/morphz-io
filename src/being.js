@@ -16,7 +16,6 @@ export function liftOf(b) {
   return v
 }
 import {
-  createBeingState,
   morphBeingState,
   placeBeingState,
   stepBeingState,
@@ -114,10 +113,6 @@ function makeBar() {
 export function outlineColor(b) {
   if (b.isPlayer) return GOLD
   return teamLook(false, b.team).color
-}
-
-export function createBeing(scene, defId, name, isPlayer, team) {
-  return skinBeing(scene, createBeingState(defId, name, isPlayer, team))
 }
 
 export function skinBeing(scene, b) {

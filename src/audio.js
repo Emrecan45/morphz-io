@@ -103,13 +103,3 @@ function startMusic() {
   musicSource.start()
 }
 
-export function stopMusic() {
-  musicWanted = false
-  if (!musicSource) return
-  try {
-    musicSource.stop()
-  } catch {
-  }
-  musicSource.disconnect()
-  musicSource = null
-}

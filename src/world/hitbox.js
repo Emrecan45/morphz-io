@@ -8,23 +8,6 @@ export function hitbox(b) {
   return { footprint: h.r, body: h.x, mask: h.m, bound }
 }
 
-export function maskHit(b, x, z, r) {
-  const dx = x - b.x
-  const dz = z - b.z
-  const far = b.bound + r
-  if (dx * dx + dz * dz > far * far) return false
-  const c = Math.cos(b.yaw)
-  const s = Math.sin(b.yaw)
-  const lx = dx * c - dz * s
-  const lz = dx * s + dz * c
-  for (const part of b.mask) {
-    const q = part[1] + r
-    const ez = lz - part[0]
-    if (lx * lx + ez * ez <= q * q) return true
-  }
-  return false
-}
-
 export function maskSweep(b, x0, z0, x1, z1, r) {
   const c = Math.cos(b.yaw)
   const s = Math.sin(b.yaw)

@@ -12,10 +12,6 @@ export let lastReason = ''
 
 const TOKEN_TTL = 240000
 
-export function captchaOn() {
-  return !!STORE_KEY
-}
-
 let slot = null
 let watchers = []
 

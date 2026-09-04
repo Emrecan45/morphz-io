@@ -106,10 +106,7 @@ Everyone joins a room the same way, like any other .io game.
   and every living member of the holding team banks a fat share of biomass. Walking into the enemy
   base kills you instantly.
 
-Rooms are never empty and a match is always running, so you drop straight into a live arena instead
-of waiting on a lobby. When no server can be reached the whole match runs in the browser instead, and
-there the opponents say what they are: they carry a bot tag next to their name and play deliberately
-worse.
+When no server can be reached the match runs in the browser against bots.
 
 The game speaks seven languages, picked from the browser on first launch: English, French, Spanish,
 German, Portuguese, Russian and Turkish. Nicknames are filtered in all of them.

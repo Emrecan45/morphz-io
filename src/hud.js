@@ -90,7 +90,6 @@ const LOGO_PARTS = [
   [logo9, 85.567, 22.711, 13.405],
 ]
 
-
 const KEY_LOGO = 'morphz.logo'
 
 let logoSeen = (() => {
@@ -687,10 +686,6 @@ export function hideChoices(hud) {
   hud.choice.classList.add('invisible')
 }
 
-export function choicesVisible(hud) {
-  return !hud.choice.classList.contains('invisible')
-}
-
 export function floatText(hud, text, kind) {
   const d = document.createElement('div')
   d.className = 'float ' + (kind || '')
@@ -704,7 +699,4 @@ export function floatText(hud, text, kind) {
 export function showPause(hud, on) {
   hud.el.classList.toggle('paused', on)
 }
-
-
-
 

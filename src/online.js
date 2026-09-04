@@ -30,15 +30,6 @@ export function encodeRoster(beings) {
   return list
 }
 
-export function encodeDigest(game) {
-  const list = []
-  for (const b of game.world.beings) {
-    if (!b.netId) continue
-    list.push([b.netId, Math.round(b.xp), b.alive ? 1 : 0, Math.floor(b.total)])
-  }
-  return list
-}
-
 export function encodeState(game, around) {
   const beings = []
   const range = VIEW_RADIUS * VIEW_RADIUS
@@ -117,10 +108,6 @@ export function decodeShot(t, byId) {
 
 export function shapeFrom(index) {
   return SHAPES[index] || SHAPES[0]
-}
-
-export function shapeIndex(id) {
-  return SHAPE_INDEX[id] || 0
 }
 
 export function teamFrom(index) {
