@@ -7,8 +7,8 @@ Always play the most recent version available on the `main` branch.
 
 | Version | Supported |
 | ------- | --------- |
-| Latest  | ✅        |
-| Older   | ❌        |
+| Latest  | Yes       |
+| Older   | No        |
 
 ## Reporting a vulnerability
 
