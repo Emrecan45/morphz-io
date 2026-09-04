@@ -22,22 +22,36 @@ function json(data, code) {
 }
 
 const HOME_HOSTS = ['morphz.io', 'localhost', '127.0.0.1']
+const PORTAL_HOSTS = ['crazygames.com', 'y8.com']
 
-function fromHome(request) {
+function askedBy(request) {
   const raw = request.headers.get('origin') || request.headers.get('referer') || ''
-  if (!raw) return false
-  let host
+  if (!raw) return ''
   try {
-    host = new URL(raw).hostname
+    return new URL(raw).hostname.toLowerCase()
   } catch {
-    return false
+    return ''
   }
-  return HOME_HOSTS.some((d) => host === d || host.endsWith('.' + d))
 }
 
-async function checkToken(token, env, ip, home) {
-  if (!home) return 'ok'
+function listed(host, names) {
+  return names.some((d) => host === d || host.endsWith('.' + d))
+}
+
+function portalsOf(env) {
+  const extra = String(env.PORTAL_HOSTS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  return PORTAL_HOSTS.concat(extra)
+}
+
+async function checkToken(token, env, ip, request) {
   if (!env.TURNSTILE_SECRET) return 'ok'
+  const host = askedBy(request)
+  if (!host) return 'refused'
+  if (listed(host, portalsOf(env))) return 'ok'
+  if (!listed(host, HOME_HOSTS)) return 'refused'
   if (!token || token === 'local') return 'refused'
   const form = new FormData()
   form.append('secret', env.TURNSTILE_SECRET)
@@ -55,8 +69,8 @@ async function checkToken(token, env, ip, home) {
   }
 }
 
-async function verifyToken(token, env, ip, home) {
-  return (await checkToken(token, env, ip, home)) === 'ok'
+async function verifyToken(token, env, ip, request) {
+  return (await checkToken(token, env, ip, request)) === 'ok'
 }
 
 const PASS_TTL = 7200000
@@ -147,7 +161,7 @@ async function handleContact(request, env) {
   if (message.length < 10) return json({ ok: false }, 400)
   if (email && !validEmail(email)) return json({ ok: false }, 400)
 
-  const verdict = await checkToken(data && data.token, env, request.headers.get('cf-connecting-ip'), fromHome(request))
+  const verdict = await checkToken(data && data.token, env, request.headers.get('cf-connecting-ip'), request)
   if (verdict === 'refused') return json({ ok: true })
 
   if (!env.EMAIL && !env.RESEND_KEY) return json({ ok: false }, 500)
@@ -370,7 +384,7 @@ export default {
       let pass = ''
       if (!(await readPass(env, held))) {
         const token = url.searchParams.get('token') || ''
-        const ok = await verifyToken(token, env, request.headers.get('cf-connecting-ip'), fromHome(request))
+        const ok = await verifyToken(token, env, request.headers.get('cf-connecting-ip'), request)
         if (!ok) return json({ error: 'captcha' }, 403)
         pass = await mintPass(env)
       }

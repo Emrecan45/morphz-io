@@ -2223,3 +2223,59 @@ a.footer-author:hover {
   font-size: 14px;
   color: var(--soft);
 }
+
+.adwait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 18px;
+  background: rgba(10, 20, 15, 0.72);
+  backdrop-filter: blur(3px);
+  z-index: 12;
+  animation: veil-in 0.22s ease both;
+}
+
+.adwait-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 5px solid rgba(168, 224, 95, 0.2);
+  border-top-color: var(--accent);
+  animation: adwait-spin 0.9s linear infinite;
+}
+
+.adwait-text {
+  margin: 0;
+  max-width: 22em;
+  text-align: center;
+  line-height: 1.35;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+@keyframes adwait-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 500px) {
+  .adwait {
+    gap: 13px;
+    padding: 12px;
+  }
+  .adwait-ring {
+    width: 38px;
+    height: 38px;
+    border-width: 4px;
+  }
+  .adwait-text {
+    font-size: 15px;
+  }
+}
