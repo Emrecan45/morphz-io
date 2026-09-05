@@ -699,6 +699,7 @@ export function createView(canvas, statics) {
   const view = { renderer, scene, camera, composer, sun, bloom, canvas, seaTime: ground.userData.seaTime, blocks: decor.blocks, bushes: decor.bushes, fx: decor.fx }
   resizeView(view)
   window.addEventListener('resize', () => resizeView(view))
+  if (window.ResizeObserver) new ResizeObserver(() => resizeView(view)).observe(canvas)
   return view
 }
 
@@ -711,6 +712,9 @@ export function fovFor(aspect) {
 export function resizeView(view) {
   const w = view.canvas.clientWidth || window.innerWidth
   const h = view.canvas.clientHeight || window.innerHeight
+  if (!w || !h || (w === view.lastW && h === view.lastH)) return
+  view.lastW = w
+  view.lastH = h
   view.renderer.setSize(w, h, false)
   view.composer.setSize(w, h)
   view.camera.aspect = w / h

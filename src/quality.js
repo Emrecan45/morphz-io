@@ -8,7 +8,7 @@ export const COARSE = ask('(pointer: coarse)') || ask('(hover: none)')
 export const LOW = COARSE
 
 export const QUALITY = LOW
-  ? { pixelRatio: 1.5, samples: 0, antialias: false, shadowMap: 1024, softShadow: false, shadowSpan: 24 }
+  ? { pixelRatio: 2, samples: 0, antialias: false, shadowMap: 1024, softShadow: false, shadowSpan: 24 }
   : { pixelRatio: 2, samples: 4, antialias: true, shadowMap: 3072, softShadow: true, shadowSpan: 30 }
 
 export function markTouch() {
