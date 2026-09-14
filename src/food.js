@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { makeFoodField } from './scene.js'
+import { QUALITY } from './quality.js'
 import { pullX, pullZ } from './lift.js'
 import {
   SPECIES,
@@ -45,19 +46,24 @@ export function foodHeight(item) {
   return SPECIES[item.ring].size + 0.4
 }
 
-export function drawFood(food, dt) {
+export function drawFood(food, dt, cx, cz) {
   if (!food.dummy) return
   food.t += dt
   const d = food.dummy
+  const reach = QUALITY.spin
+  const near = cx === undefined ? Infinity : reach * reach
   for (const g of food.groups) {
-    for (let i = 0; i < g.items.length; i++) {
-      const it = g.items[i]
-      if (!it.alive) {
-        d.position.set(0, -60, 0)
-        d.scale.setScalar(0.0001)
-        d.updateMatrix()
-        g.mesh.setMatrixAt(i, d.matrix)
-        g.mesh.userData.outline.setMatrixAt(i, d.matrix)
+    const items = g.items
+    const mesh = g.mesh
+    const line = mesh.userData.outline
+    let slot = 0
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (!it.alive) continue
+      const dx = it.x - cx
+      const dz = it.z - cz
+      if (dx * dx + dz * dz > near) {
+        if (it.scale < 1) it.scale = 1
         continue
       }
       it.scale = Math.min(1, it.scale + dt * 3.4)
@@ -67,10 +73,19 @@ export function drawFood(food, dt) {
       d.rotation.set(food.t * 0.7 + it.phase, food.t * 0.9 + it.phase, 0)
       d.scale.setScalar(g.size * it.scale)
       d.updateMatrix()
-      g.mesh.setMatrixAt(i, d.matrix)
-      g.mesh.userData.outline.setMatrixAt(i, d.matrix)
+      mesh.setMatrixAt(slot, d.matrix)
+      line.setMatrixAt(slot, d.matrix)
+      slot++
     }
-    g.mesh.instanceMatrix.needsUpdate = true
-    g.mesh.userData.outline.instanceMatrix.needsUpdate = true
+    mesh.count = slot
+    line.count = slot
+    if (!slot) continue
+    const span = slot * 16
+    mesh.instanceMatrix.clearUpdateRanges()
+    mesh.instanceMatrix.addUpdateRange(0, span)
+    mesh.instanceMatrix.needsUpdate = true
+    line.instanceMatrix.clearUpdateRanges()
+    line.instanceMatrix.addUpdateRange(0, span)
+    line.instanceMatrix.needsUpdate = true
   }
 }

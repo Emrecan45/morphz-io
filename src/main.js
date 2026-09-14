@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three'
 import { ARENA, CAM, CAM_PULL, CAM_PITCH, UPGRADES, BUSHES, ZONE, GOLD, CREATURES, cssHex, teamLook } from './config.js'
-import { createView, moveSun, makeBases, fadeBush, smoothGeo, stepSea } from './scene.js'
+import { createView, moveSun, makeBases, fadeBush, smoothGeo, stepSea, applyQuality, freezeStatic, paintView } from './scene.js'
 import { buildStaticWorld } from './world/decor.js'
 import { outlineMaterial, SHOT_OUTLINE } from './outline.js'
 import { toonMaterial } from './toon.js'
@@ -50,6 +50,8 @@ import {
   spendPoint,
   applyMods,
   canEvolve,
+  tryAttack,
+  stepBursts,
 } from './being.js'
 import { createInput, inputVector } from './input.js'
 import {
@@ -63,7 +65,7 @@ import {
   markLogoSeen,
 } from './hud.js'
 import { unlockAudio, toggleMute, musicMuted } from './audio.js'
-import { markTouch } from './quality.js'
+import { markTouch, QUALITY, onQualityChange, feedFrame } from './quality.js'
 import {
   initSdk,
   loadingStart,
@@ -90,7 +92,7 @@ const DEATH_PAUSE = 1500
 const CATCH_UP = 5
 const FOLLOW_RATE = 16
 const SHOT_FADE = 0.3
-const CULL_RADIUS = 62
+const MAX_BACKLOG = 0.1
 const LIVE_WINDOW = 700
 const AD_ALIVE = 4000
 let bootAt = 0
@@ -145,6 +147,43 @@ const net = {
   fromServer: false,
   joining: null,
   byId: new Map(),
+  attackLatch: false,
+}
+
+const PREDICT_TTL = 1000
+const quietHooks = { onShot() {} }
+let predictCounter = 0
+
+function predictShots(p, dt) {
+  const world = game.world
+  const before = world.shots.length
+  if (game.input.attack) tryAttack(p, world, quietHooks)
+  stepBursts(p, dt, world, quietHooks)
+  if (world.shots.length === before) return
+  const now = performance.now()
+  for (let i = before; i < world.shots.length; i++) {
+    const s = world.shots[i]
+    s.id = -(++predictCounter)
+    s.predicted = true
+    s.born = now
+  }
+}
+
+function adoptShot(mine, s, now) {
+  const age = (now - mine.born) / 1000
+  mine.id = s.id
+  mine.vx = s.vx
+  mine.vz = s.vz
+  mine.x = s.x + s.vx * age
+  mine.z = s.z + s.vz * age
+  mine.y = s.y
+  mine.life = s.life - age
+  mine.radius = s.radius
+  mine.pierce = s.pierce
+  mine.damage = s.damage
+  mine.poison = s.poison
+  mine.color = s.color
+  mine.predicted = false
 }
 
 let shotPool = null
@@ -174,31 +213,43 @@ function aimFace() {
   return { x: dx, z: dz, snap: true }
 }
 
+const SHOT_MAX = 460
+const SHOT_WARM = 96
+const SHOT_STEP = 32
+
 function makeShotPool(scene) {
   const geo = new THREE.SphereGeometry(1, 16, 12)
   const outlineGeo = smoothGeo(geo)
   const outlineMat = outlineMaterial(SHOT_OUTLINE)
   const venomMat = outlineMaterial(VENOM_RING)
   const pool = []
-  for (let i = 0; i < 460; i++) {
-    const skin = toonMaterial({ color: 0xffffff, emissive: 0x000000, emissiveIntensity: 1.25 })
-    skin.transparent = true
-    const edge = outlineMat.clone()
-    edge.transparent = true
-    const m = new THREE.Mesh(geo, skin)
-    m.add(new THREE.Mesh(outlineGeo, edge))
-    const glow = venomMat.clone()
-    glow.transparent = true
-    glow.depthWrite = false
-    glow.uniforms.tint.value.setHex(VENOM_TINT)
-    const halo = new THREE.Mesh(outlineGeo, glow)
-    halo.renderOrder = -1
-    halo.visible = false
-    m.add(halo)
-    m.visible = false
-    scene.add(m)
-    pool.push(m)
+  pool.grow = (want) => {
+    const goal = Math.min(SHOT_MAX, Math.ceil(want / SHOT_STEP) * SHOT_STEP)
+    while (pool.length < goal) {
+      const skin = toonMaterial({ color: 0xffffff, emissive: 0x000000, emissiveIntensity: 1.25 })
+      skin.transparent = true
+      const edge = outlineMat.clone()
+      edge.transparent = true
+      const m = new THREE.Mesh(geo, skin)
+      const line = new THREE.Mesh(outlineGeo, edge)
+      line.matrixAutoUpdate = false
+      m.add(line)
+      const glow = venomMat.clone()
+      glow.transparent = true
+      glow.depthWrite = false
+      glow.uniforms.tint.value.setHex(VENOM_TINT)
+      const halo = new THREE.Mesh(outlineGeo, glow)
+      halo.renderOrder = -1
+      halo.visible = false
+      halo.matrixAutoUpdate = false
+      m.add(halo)
+      m.visible = false
+      m.matrixAutoUpdate = false
+      scene.add(m)
+      pool.push(m)
+    }
   }
+  pool.grow(SHOT_WARM)
   return pool
 }
 
@@ -566,6 +617,7 @@ function paintShot(m, x, y, z, radius, color, alpha, venom) {
   m.visible = true
   m.position.set(pullX(x, h), h, pullZ(z, h))
   m.scale.setScalar(radius)
+  m.updateMatrix()
   m.material.color.setHex(color)
   m.material.emissive.setHex(color).multiplyScalar(0.45)
   m.material.opacity = alpha
@@ -577,6 +629,7 @@ function paintShot(m, x, y, z, radius, color, alpha, venom) {
 
 function drawShots() {
   const shots = game.world.shots
+  shotPool.grow(shots.length + game.fading.length)
   let n = 0
   for (let i = 0; i < shots.length && n < shotPool.length; i++, n++) {
     const s = shots[i]
@@ -591,8 +644,14 @@ function drawShots() {
 
 function advanceRemoteShots(dt) {
   const shots = game.world.shots
+  const now = performance.now()
   for (let i = shots.length - 1; i >= 0; i--) {
     const s = shots[i]
+    if (s.predicted && now - s.born > PREDICT_TTL) {
+      startFade(s)
+      shots.splice(i, 1)
+      continue
+    }
     s.life -= dt
     s.x += s.vx * dt
     s.z += s.vz * dt
@@ -655,8 +714,13 @@ function tickOffline(dt) {
 function tickOnline(dt) {
   const p = game.player
   if (p && p.alive) {
-    if (!game.pause && !game.watching) stepBeing(p, dt, ...inputVector(game.input), game.world, aimFace())
-    else stepBeing(p, dt, 0, 0, game.world, null)
+    if (!game.pause && !game.watching) {
+      stepBeing(p, dt, ...inputVector(game.input), game.world, aimFace())
+      if (game.input.attack) net.attackLatch = true
+      predictShots(p, dt)
+    } else {
+      stepBeing(p, dt, 0, 0, game.world, null)
+    }
     reconcile(p, dt)
   }
   const k = 1 - Math.exp(-FOLLOW_RATE * dt)
@@ -759,7 +823,7 @@ function present(dt) {
 
   for (const b of world.beings) {
     if (!b.mesh) continue
-    if (!b.alive || (net.sync && !b.seen && b !== p) || (b !== p && distToView(b.x, b.z) > CULL_RADIUS)) {
+    if (!b.alive || (net.sync && !b.seen && b !== p) || (b !== p && distToView(b.x, b.z) > QUALITY.cull)) {
       b.veil = b.hidden && b !== p ? 1 : 0
       b.label.visible = false
       b.bar.visible = false
@@ -802,7 +866,8 @@ function present(dt) {
   stepFades(dt)
   drawShots()
   stepSea(game.view, dt)
-  drawFood(world.food, dt)
+  const eye = game.player || game.anchor
+  drawFood(world.food, dt, eye ? eye.x : 0, eye ? eye.z : 0)
   updateParticles(dt)
   updateAuras(dt)
   zonePulse(dt)
@@ -890,14 +955,15 @@ function frame(now) {
     requestAnimationFrame(frame)
     return
   }
-  let leftOver = Math.min(0.5, (now - last) / 1000) || 0
+  feedFrame(now - last)
+  let leftOver = Math.min(MAX_BACKLOG, (now - last) / 1000) || 0
   last = now
   while (leftOver > 0.0005) {
     const stepDt = Math.min(0.05, leftOver)
     update(stepDt)
     leftOver -= stepDt
   }
-  game.view.composer.render()
+  paintView(game.view)
   if (painted < 2) painted++
   requestAnimationFrame(frame)
 }
@@ -980,8 +1046,9 @@ function sendInput(dt) {
     Math.round(iz * 100) / 100,
     face ? Math.round(face.x * 100) / 100 : 0,
     face ? Math.round(face.z * 100) / 100 : 0,
-    game.input.attack ? 1 : 0,
+    game.input.attack || net.attackLatch ? 1 : 0,
   ])
+  net.attackLatch = false
 }
 
 function beingById(id) {
@@ -1153,10 +1220,19 @@ function receive(type, data) {
   }
   if (type === 'shots') {
     const heard = new Set()
+    const now = performance.now()
+    const shots = game.world.shots
     for (const line of data) {
       const s = decodeShot(line, beingById)
       s.color = s.owner ? tintOf(s.owner) : teamLook(false, s.team).color
-      game.world.shots.push(s)
+      if (s.owner && s.owner === game.player) {
+        const mine = shots.find((o) => o.predicted)
+        if (mine) {
+          adoptShot(mine, s, now)
+          continue
+        }
+      }
+      shots.push(s)
       if (heard.has(s.owner)) continue
       heard.add(s.owner)
       if (s.owner) s.owner.swing = 1
@@ -1773,10 +1849,12 @@ function buildWorld(mode) {
   game.dressed = true
   const statics = buildStaticWorld()
   game.view = createView(canvas, statics)
+  applyQuality(game.view)
+  onQualityChange(() => applyQuality(game.view))
   aimCamera(game.view.camera)
   const scene = game.view.scene
   bases = makeBases()
-  scene.add(bases)
+  scene.add(freezeStatic(bases))
   shotPool = makeShotPool(scene)
   particles = makeParticles(scene)
   auras = makeAuras(scene)

@@ -47,7 +47,7 @@ export function createFood(grid) {
     return { items, ring, size: espece.size }
   })
   rng = Math.random
-  return { groups, t: 0, grid, hive: null, local: true, onEatEvent: null, onRepop: null }
+  return { groups, t: 0, grid, hive: null, local: true, onEatEvent: null, onRepop: null, stale: true, waiting: 0, since: 0 }
 }
 
 export function foodValue(item) {
@@ -55,13 +55,21 @@ export function foodValue(item) {
 }
 
 function sortFood(food) {
+  if (food.hive && !food.stale) return food.hive
   if (!food.hive) food.hive = makeSwarm()
   const all = []
   for (const g of food.groups) {
     for (let i = 0; i < g.items.length; i++) all.push(g.items[i])
   }
   fillSwarm(food.hive, all, sizeOf)
+  food.stale = false
   return food.hive
+}
+
+const HASH_GAP = 0.25
+
+export function touchFood(food) {
+  food.stale = true
 }
 
 function sizeOf(it) {
@@ -70,21 +78,29 @@ function sizeOf(it) {
 
 export function updateFood(food, dt) {
   if (!food.local) return
-  for (const g of food.groups) {
-    for (let i = 0; i < g.items.length; i++) {
-      const it = g.items[i]
-      if (it.alive) continue
-      it.timer -= dt
-      if (it.timer > 0) continue
-      const [x, z] = placeInRing(g.ring, food.grid, g.size)
-      it.x = x
-      it.z = z
-      it.alive = true
-      it.scale = 0
-      if (food.onRepop) food.onRepop(g.ring, i, x, z)
+  if (food.waiting > 0) {
+    for (const g of food.groups) {
+      for (let i = 0; i < g.items.length; i++) {
+        const it = g.items[i]
+        if (it.alive) continue
+        it.timer -= dt
+        if (it.timer > 0) continue
+        const [x, z] = placeInRing(g.ring, food.grid, g.size)
+        it.x = x
+        it.z = z
+        it.alive = true
+        it.scale = 0
+        food.waiting--
+        touchFood(food)
+        if (food.onRepop) food.onRepop(g.ring, i, x, z)
+      }
     }
   }
-  sortFood(food)
+  food.since += dt
+  if (food.since >= HASH_GAP) {
+    food.since = 0
+    sortFood(food)
+  }
 }
 
 export function eatAround(food, being, onEat) {
@@ -97,6 +113,7 @@ export function eatAround(food, being, onEat) {
     if (dx * dx + dz * dz > reach * reach) return true
     it.alive = false
     it.timer = FOOD.respawn
+    food.waiting++
     if (food.onEatEvent) food.onEatEvent(it.ring, it.slot)
     onEat(foodValue(it), it)
     return true
@@ -113,6 +130,8 @@ export function resetFood(food) {
       it.scale = 1
     }
   }
+  food.waiting = 0
+  food.stale = true
 }
 
 export function markEaten(food, group, index) {
@@ -122,6 +141,7 @@ export function markEaten(food, group, index) {
   if (!it || !it.alive) return
   it.alive = false
   it.timer = FOOD.respawn
+  food.waiting++
 }
 
 export function restartRepop(food) {
@@ -165,11 +185,13 @@ export function scatterFood(food, x, z, count, ring) {
       pz = z + Math.sin(a) * rad
       if (!spotTaken(food.grid, px, pz, g.size)) break
     }
+    if (!it.alive) food.waiting--
     it.x = px
     it.z = pz
     it.alive = true
     it.scale = 0
     it.timer = 0
+    touchFood(food)
     if (food.onRepop) food.onRepop(g.ring, i, px, pz)
   }
 }

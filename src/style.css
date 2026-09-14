@@ -592,7 +592,7 @@ body.ready .home .box {
 }
 
 .home.busy .box,
-.home.busy .topbar,
+.home.busy .topbar-side,
 .home.busy .home-footer {
   pointer-events: none;
 }
@@ -1078,7 +1078,10 @@ body.touch .pad {
 @media (max-width: 760px) {
   .topbar {
     top: 10px;
+    left: 10px;
     right: 10px;
+  }
+  .topbar-side {
     gap: 6px;
   }
 }
@@ -1158,6 +1161,7 @@ body.touch .pad {
 
 body.touch .topbar {
   top: calc(12px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
   right: calc(12px + env(safe-area-inset-right, 0px));
 }
 
@@ -1658,10 +1662,19 @@ a.footer-author:hover {
 .topbar {
   position: absolute;
   top: 18px;
+  left: 18px;
   right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.topbar-side {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .pill-wrap {
@@ -2167,7 +2180,10 @@ a.footer-author:hover {
   }
   .topbar {
     top: 10px;
+    left: 10px;
     right: 10px;
+  }
+  .topbar-side {
     gap: 6px;
   }
   .pill {
@@ -2380,4 +2396,10 @@ a.footer-author:hover {
   .adwait-text {
     font-size: 15px;
   }
+}
+
+.pill-tag {
+  margin-left: 7px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
 }

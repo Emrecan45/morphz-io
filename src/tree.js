@@ -50,6 +50,17 @@ function breathe() {
   return new Promise((ok) => requestAnimationFrame(() => ok()))
 }
 
+const SCAN_WIDE = 96
+let pad = null
+
+function scratch(w, h) {
+  if (!pad) pad = document.createElement('canvas')
+  const k = Math.min(1, SCAN_WIDE / Math.max(1, w))
+  pad.width = Math.max(2, Math.round(w * k))
+  pad.height = Math.max(2, Math.round(h * k))
+  return pad
+}
+
 async function shotOf(id) {
   if (shots.has(id)) return shots.get(id)
   await breathe()
@@ -60,19 +71,20 @@ async function shotOf(id) {
     img.onerror = ok
     img.src = url
   })
-  const cv = document.createElement('canvas')
-  cv.width = img.naturalWidth || 2
-  cv.height = img.naturalHeight || 2
+  const full = { w: img.naturalWidth || 2, h: img.naturalHeight || 2 }
+  const cv = scratch(full.w, full.h)
   const g = cv.getContext('2d', { willReadFrequently: true })
-  g.drawImage(img, 0, 0)
+  g.clearRect(0, 0, cv.width, cv.height)
+  g.drawImage(img, 0, 0, cv.width, cv.height)
   const px = g.getImageData(0, 0, cv.width, cv.height).data
   let x0 = cv.width
   let y0 = cv.height
   let x1 = -1
   let y1 = -1
   for (let y = 0; y < cv.height; y++) {
+    const line = y * cv.width
     for (let x = 0; x < cv.width; x++) {
-      if (px[(y * cv.width + x) * 4 + 3] < 12) continue
+      if (px[(line + x) * 4 + 3] < 12) continue
       if (x < x0) x0 = x
       if (x > x1) x1 = x
       if (y < y0) y0 = y
@@ -87,8 +99,8 @@ async function shotOf(id) {
   }
   const out = {
     url,
-    w: cv.width,
-    h: cv.height,
+    w: full.w,
+    h: full.h,
     box: [x0 / cv.width, y0 / cv.height, (x1 + 1) / cv.width, (y1 + 1) / cv.height],
   }
   shots.set(id, out)
