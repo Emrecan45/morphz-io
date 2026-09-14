@@ -20,7 +20,7 @@ import { GAME_NAME, VERSION } from './brand.js'
 import { zoneInfo, holdingTeam } from './zoneview.js'
 import { showBanner, clearBanners, bannerState } from './sdk.js'
 import { ZONE } from './config.js'
-import { enterImmersive } from './quality.js'
+import { enterImmersive, chooseTier, qualityTier } from './quality.js'
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]))
@@ -43,21 +43,35 @@ const PROMO_WAIT = 3000
 const PROMO_SETTLE = 400
 const PROMO_INTRO = 2500
 
+const GFX_LABEL = { high: 'gfxHigh', floor: 'gfxFloor' }
+
 function topBar(layer) {
   const bar = document.createElement('div')
   bar.className = 'topbar'
+  const lead = document.createElement('div')
+  lead.className = 'topbar-side'
+  const tail = document.createElement('div')
+  tail.className = 'topbar-side'
+  bar.appendChild(lead)
+  bar.appendChild(tail)
 
-  const wrap = document.createElement('div')
-  wrap.className = 'pill-wrap'
-  wrap.innerHTML = `<button class="pill sound" type="button"></button>`
-  bar.appendChild(wrap)
+  lead.appendChild(helpButton(layer))
+  lead.appendChild(discordButton(layer))
+
+  const gfx = document.createElement('button')
+  gfx.type = 'button'
+  gfx.className = 'pill gfx'
+  tail.appendChild(gfx)
 
   const flag = document.createElement('button')
   flag.type = 'button'
   flag.className = 'pill flag'
-  bar.appendChild(flag)
-  bar.appendChild(helpButton(layer))
-  bar.appendChild(discordButton(layer))
+  tail.appendChild(flag)
+
+  const wrap = document.createElement('div')
+  wrap.className = 'pill-wrap'
+  wrap.innerHTML = `<button class="pill sound" type="button"></button>`
+  tail.appendChild(wrap)
 
   const sound = wrap.querySelector('.sound')
   const paintSound = () => {
@@ -75,6 +89,17 @@ function topBar(layer) {
   paintSound()
   bar.dropMute = onMuteChange(paintSound)
 
+  const paintGfx = () => {
+    const label = t(GFX_LABEL[qualityTier()])
+    gfx.innerHTML = iconMarkup('gfx', 'pill-ico') + '<b class="pill-tag">' + label + '</b>'
+    gfx.title = t('graphics') + ' : ' + label
+    gfx.setAttribute('aria-label', gfx.title)
+  }
+  gfx.addEventListener('click', () => {
+    chooseTier(qualityTier() === 'high' ? 'floor' : 'high')
+    paintGfx()
+  })
+
   flag.addEventListener('click', () => {
     const ids = LANGUAGES.map((l) => l.id)
     const at = ids.indexOf(language())
@@ -83,6 +108,7 @@ function topBar(layer) {
 
   bar.applyTexts = () => {
     paintSound()
+    paintGfx()
     const here = LANGUAGES.find((l) => l.id === language())
     flag.innerHTML = flagMarkup(language())
     flag.title = t('language') + ' : ' + (here ? here.name : language())

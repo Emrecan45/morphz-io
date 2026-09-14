@@ -135,6 +135,7 @@ export function applyFood(food, diff, animate) {
     const it = group.items[i]
     if (!it) continue
     it.alive = !!alive
+    if (alive) food.stale = true
     if (alive) {
       it.x = x
       it.z = z

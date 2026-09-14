@@ -92,6 +92,8 @@ function makeLabel(text, color) {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }))
   sprite.scale.set(4.2, 1.05, 1)
   sprite.renderOrder = 10
+  sprite.matrixAutoUpdate = false
+  sprite.updateMatrix()
   return sprite
 }
 
@@ -104,8 +106,14 @@ function makeBar() {
   fill.scale.set(2.5, 0.22, 1)
   fill.renderOrder = 12
   fill.position.z = 0.01
+  back.matrixAutoUpdate = false
+  back.updateMatrix()
+  fill.matrixAutoUpdate = false
+  fill.updateMatrix()
   group.add(back)
   group.add(fill)
+  group.matrixAutoUpdate = false
+  group.updateMatrix()
   group.userData = { fill, width: 2.5 }
   return group
 }
@@ -137,6 +145,8 @@ export function skinBeing(scene, b) {
   ring.renderOrder = 1
   ring.scale.setScalar(ringScale(b))
   ring.userData.base = ringScale(b)
+  ring.matrixAutoUpdate = false
+  ring.updateMatrix()
   scene.add(ring)
   b.ring = ring
 
@@ -156,6 +166,7 @@ export function placeBeing(b, x, z) {
   const dz = pullZ(z, h)
   b.mesh.position.set(dx, 0, dz)
   b.ring.position.set(dx, 0.05, dz)
+  b.ring.updateMatrix()
 }
 
 export function stepBeing(b, dt, dirX, dirZ, world, face) {
@@ -170,6 +181,7 @@ export function placeVisual(b, dt) {
   b.mesh.position.set(dx, 0, dz)
   b.mesh.rotation.y = b.yaw
   b.ring.position.set(dx, 0.07, dz)
+  b.ring.updateMatrix()
   if (b.moveShown === undefined) b.moveShown = b.moveRatio
   b.moveShown += (b.moveRatio - b.moveShown) * (1 - Math.exp(-11 * dt))
   animateCreature(b.mesh, dt, b.moveShown, b.swing)
@@ -212,6 +224,7 @@ export function retintBeing(scene, b, team) {
   b.mesh.position.set(dx, 0, dz)
   b.mesh.rotation.y = yaw
   b.ring.position.set(dx, 0.07, dz)
+  b.ring.updateMatrix()
   return b
 }
 
@@ -231,6 +244,7 @@ export function morphBeing(scene, b, defId) {
   b.ring.material.color.setHex(outlineColor(b))
   b.ring.scale.setScalar(ringScale(b))
   b.ring.userData.base = ringScale(b)
+  b.ring.updateMatrix()
   b.fadedMesh = null
   retintLabel(scene, b)
   return b
@@ -395,5 +409,10 @@ export function updateOverlay(b, camera) {
     if (b.hidden) b.ring.material.color.lerp(GREY, b.isPlayer ? 0.24 : 0.72)
     b.ring.scale.setScalar(baseScale)
   }
+  b.ring.updateMatrix()
+  b.label.updateMatrix()
+  b.bar.updateMatrix()
+  u.fill.updateMatrix()
+  b.bar.children[0].updateMatrix()
 }
 

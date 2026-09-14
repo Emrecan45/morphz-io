@@ -1,9 +1,9 @@
 export const ARENA = {
-  half: 150,
+  half: 105,
   rings: [
-    { name: 'The Rim', from: 86, to: 150, food: 2, color: 0x6f9e52, density: 1 },
-    { name: 'The Pits', from: 38, to: 86, food: 6, color: 0xb8863a, density: 0.8 },
-    { name: 'The Core', from: 0, to: 38, food: 16, color: 0x79479e, density: 0.55 },
+    { name: 'The Rim', from: 60, to: 105, food: 2, color: 0x6f9e52, density: 1 },
+    { name: 'The Pits', from: 27, to: 60, food: 6, color: 0xb8863a, density: 0.8 },
+    { name: 'The Core', from: 0, to: 27, food: 16, color: 0x79479e, density: 0.55 },
   ],
 }
 
@@ -24,19 +24,19 @@ export function squarePoint(d, rng) {
 }
 
 export const ROCKS = {
-  count: 200,
+  count: 98,
   min: 0.7,
   max: 2.0,
 }
 
 export const TREES = {
-  count: 300,
+  count: 147,
   min: 0.9,
   max: 2.4,
 }
 
 export const BUSHES = {
-  count: 110,
+  count: 54,
   min: 2.4,
   max: 4.2,
   reveal: 4,
@@ -105,7 +105,7 @@ export const MODES = {
 }
 
 export const ZONE = {
-  radius: 18,
+  radius: 13,
   firstDelay: 90,
   between: 48,
   speed: 6.4,
@@ -117,7 +117,7 @@ export const ZONE = {
 }
 
 export const BASES = {
-  depth: 24,
+  depth: 17,
 }
 
 export function baseAt(x) {

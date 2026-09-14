@@ -4,12 +4,37 @@ import { toonMaterial } from './toon.js'
 import { hitbox } from './world/hitbox.js'
 import { frame } from './world/stance.js'
 
-const SPHERE = new THREE.SphereGeometry(1, 22, 16)
-const CAPSULE = new THREE.CapsuleGeometry(1, 1.4, 8, 18)
-const CONE = new THREE.ConeGeometry(1, 1, 14)
+const SPHERE = 'sphere'
+const CAPSULE = 'capsule'
+const CONE = 'cone'
+
+const STEPS = [
+  { upTo: 0.14, sphere: [6, 4], capsule: [2, 6], cone: 6 },
+  { upTo: 0.4, sphere: [10, 7], capsule: [3, 9], cone: 8 },
+  { upTo: Infinity, sphere: [16, 11], capsule: [4, 12], cone: 10 },
+]
+
+const geoCache = new Map()
+const shared = new Set()
+
+function geoFor(kind, reach) {
+  let level = 0
+  while (level < STEPS.length - 1 && reach > STEPS[level].upTo) level++
+  const key = kind + level
+  let geo = geoCache.get(key)
+  if (geo) return geo
+  const step = STEPS[level]
+  if (kind === SPHERE) geo = new THREE.SphereGeometry(1, step.sphere[0], step.sphere[1])
+  else if (kind === CAPSULE) geo = new THREE.CapsuleGeometry(1, 1.4, step.capsule[0], step.capsule[1])
+  else geo = new THREE.ConeGeometry(1, 1, step.cone)
+  geoCache.set(key, geo)
+  shared.add(geo)
+  return geo
+}
 
 const matCache = new Map()
 let OUTLINE_CFG = outlineMaterial(CREATURE_OUTLINE)
+let CURRENT_SIZE = 1
 let CLAW = null
 
 function mat(color, emissive) {
@@ -26,12 +51,17 @@ function mat(color, emissive) {
   return m
 }
 
-function part(geo, material, x, y, z, sx, sy, sz) {
+function part(kind, material, x, y, z, sx, sy, sz) {
+  const ry = sy === undefined ? sx : sy
+  const rz = sz === undefined ? sx : sz
+  const geo = geoFor(kind, Math.max(sx, ry, rz) * CURRENT_SIZE)
   const m = new THREE.Mesh(geo, material)
   m.position.set(x, y, z)
-  m.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz)
+  m.scale.set(sx, ry, rz)
   m.castShadow = true
-  m.add(new THREE.Mesh(geo, OUTLINE_CFG))
+  const line = new THREE.Mesh(geo, OUTLINE_CFG)
+  line.matrixAutoUpdate = false
+  m.add(line)
   return m
 }
 
@@ -166,6 +196,7 @@ function addTail(parent, material, segments, y, z, radius) {
 
 export function buildCreature(def, tint) {
   OUTLINE_CFG = outlineMaterial(creatureOutline(def.size))
+  CURRENT_SIZE = def.size
   const root = new THREE.Group()
   const bob = new THREE.Group()
   root.add(bob)
@@ -383,8 +414,18 @@ export function buildCreature(def, tint) {
     footprint: g.footprint,
     body: g.body,
   }
+  freezeStatics(root, [bob, skull, jaw, ...legs, ...tail, ...spine, ...throat, ...quills])
   root.scale.setScalar(def.size)
   return root
+}
+
+function freezeStatics(root, moving) {
+  const live = new Set(moving)
+  root.traverse((o) => {
+    if (o === root || live.has(o)) return
+    o.matrixAutoUpdate = false
+    o.updateMatrix()
+  })
 }
 
 const BEAT = { bolt: 3.6, burst: 6.6, fan: 3.2, nova: 3.0 }
@@ -509,6 +550,6 @@ export function animateCreature(root, dt, moveRatio, attack) {
 
 export function disposeCreature(root) {
   root.traverse((o) => {
-    if (o.isMesh && o.geometry && o.geometry !== SPHERE && o.geometry !== CAPSULE && o.geometry !== CONE) o.geometry.dispose()
+    if (o.isMesh && o.geometry && !shared.has(o.geometry)) o.geometry.dispose()
   })
 }
