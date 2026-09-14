@@ -50,6 +50,8 @@ import {
   spendPoint,
   applyMods,
   canEvolve,
+  tryAttack,
+  stepBursts,
 } from './being.js'
 import { createInput, inputVector } from './input.js'
 import {
@@ -145,6 +147,43 @@ const net = {
   fromServer: false,
   joining: null,
   byId: new Map(),
+  attackLatch: false,
+}
+
+const PREDICT_TTL = 1000
+const quietHooks = { onShot() {} }
+let predictCounter = 0
+
+function predictShots(p, dt) {
+  const world = game.world
+  const before = world.shots.length
+  if (game.input.attack) tryAttack(p, world, quietHooks)
+  stepBursts(p, dt, world, quietHooks)
+  if (world.shots.length === before) return
+  const now = performance.now()
+  for (let i = before; i < world.shots.length; i++) {
+    const s = world.shots[i]
+    s.id = -(++predictCounter)
+    s.predicted = true
+    s.born = now
+  }
+}
+
+function adoptShot(mine, s, now) {
+  const age = (now - mine.born) / 1000
+  mine.id = s.id
+  mine.vx = s.vx
+  mine.vz = s.vz
+  mine.x = s.x + s.vx * age
+  mine.z = s.z + s.vz * age
+  mine.y = s.y
+  mine.life = s.life - age
+  mine.radius = s.radius
+  mine.pierce = s.pierce
+  mine.damage = s.damage
+  mine.poison = s.poison
+  mine.color = s.color
+  mine.predicted = false
 }
 
 let shotPool = null
@@ -605,8 +644,14 @@ function drawShots() {
 
 function advanceRemoteShots(dt) {
   const shots = game.world.shots
+  const now = performance.now()
   for (let i = shots.length - 1; i >= 0; i--) {
     const s = shots[i]
+    if (s.predicted && now - s.born > PREDICT_TTL) {
+      startFade(s)
+      shots.splice(i, 1)
+      continue
+    }
     s.life -= dt
     s.x += s.vx * dt
     s.z += s.vz * dt
@@ -669,8 +714,13 @@ function tickOffline(dt) {
 function tickOnline(dt) {
   const p = game.player
   if (p && p.alive) {
-    if (!game.pause && !game.watching) stepBeing(p, dt, ...inputVector(game.input), game.world, aimFace())
-    else stepBeing(p, dt, 0, 0, game.world, null)
+    if (!game.pause && !game.watching) {
+      stepBeing(p, dt, ...inputVector(game.input), game.world, aimFace())
+      if (game.input.attack) net.attackLatch = true
+      predictShots(p, dt)
+    } else {
+      stepBeing(p, dt, 0, 0, game.world, null)
+    }
     reconcile(p, dt)
   }
   const k = 1 - Math.exp(-FOLLOW_RATE * dt)
@@ -996,8 +1046,9 @@ function sendInput(dt) {
     Math.round(iz * 100) / 100,
     face ? Math.round(face.x * 100) / 100 : 0,
     face ? Math.round(face.z * 100) / 100 : 0,
-    game.input.attack ? 1 : 0,
+    game.input.attack || net.attackLatch ? 1 : 0,
   ])
+  net.attackLatch = false
 }
 
 function beingById(id) {
@@ -1169,10 +1220,19 @@ function receive(type, data) {
   }
   if (type === 'shots') {
     const heard = new Set()
+    const now = performance.now()
+    const shots = game.world.shots
     for (const line of data) {
       const s = decodeShot(line, beingById)
       s.color = s.owner ? tintOf(s.owner) : teamLook(false, s.team).color
-      game.world.shots.push(s)
+      if (s.owner && s.owner === game.player) {
+        const mine = shots.find((o) => o.predicted)
+        if (mine) {
+          adoptShot(mine, s, now)
+          continue
+        }
+      }
+      shots.push(s)
       if (heard.has(s.owner)) continue
       heard.add(s.owner)
       if (s.owner) s.owner.swing = 1
