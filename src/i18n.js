@@ -1,9 +1,14 @@
+import { prefGet, prefSet } from './prefs.js'
+
 const STRINGS = {
   fr: {
     zoneOpened: 'Zone à conquérir',
     zoneWon: 'Zone conquise +',
     zoneLost: 'Zone perdue',
     language: 'Langue',
+    graphics: 'Graphismes',
+    gfxHigh: 'Haut',
+    gfxFloor: 'Bas',
     play: 'Jouer',
     nicknamePh: 'Pseudo',
     errorEmpty: 'Il faut un pseudo.',
@@ -118,6 +123,9 @@ const STRINGS = {
     zoneWon: 'Zone captured +',
     zoneLost: 'Zone lost',
     language: 'Language',
+    graphics: 'Graphics',
+    gfxHigh: 'High',
+    gfxFloor: 'Low',
     play: 'Play',
     nicknamePh: 'Nickname',
     errorEmpty: 'A nickname is required.',
@@ -232,6 +240,9 @@ const STRINGS = {
     zoneWon: 'Zona conquistada +',
     zoneLost: 'Zona perdida',
     language: 'Idioma',
+    graphics: 'Gráficos',
+    gfxHigh: 'Alto',
+    gfxFloor: 'Bajo',
     play: 'Jugar',
     nicknamePh: 'Apodo',
     errorEmpty: 'Hace falta un apodo.',
@@ -346,6 +357,9 @@ const STRINGS = {
     zoneWon: 'Zone erobert +',
     zoneLost: 'Zone verloren',
     language: 'Sprache',
+    graphics: 'Grafik',
+    gfxHigh: 'Hoch',
+    gfxFloor: 'Niedrig',
     play: 'Spielen',
     nicknamePh: 'Spitzname',
     errorEmpty: 'Ein Spitzname wird benötigt.',
@@ -460,6 +474,9 @@ const STRINGS = {
     zoneWon: 'Zona conquistada +',
     zoneLost: 'Zona perdida',
     language: 'Idioma',
+    graphics: 'Gráficos',
+    gfxHigh: 'Alto',
+    gfxFloor: 'Baixo',
     play: 'Jogar',
     nicknamePh: 'Apelido',
     errorEmpty: 'É preciso um apelido.',
@@ -574,6 +591,9 @@ const STRINGS = {
     zoneWon: 'Зона захвачена +',
     zoneLost: 'Зона потеряна',
     language: 'Язык',
+    graphics: 'Графика',
+    gfxHigh: 'Высокие',
+    gfxFloor: 'Низкие',
     play: 'Играть',
     nicknamePh: 'Никнейм',
     errorEmpty: 'Нужен никнейм.',
@@ -688,6 +708,9 @@ const STRINGS = {
     zoneWon: 'Bölge alındı +',
     zoneLost: 'Bölge kaybedildi',
     language: 'Dil',
+    graphics: 'Grafik',
+    gfxHigh: 'Yüksek',
+    gfxFloor: 'Düşük',
     play: 'Oyna',
     nicknamePh: 'Takma ad',
     errorEmpty: 'Bir takma ad gerekli.',
@@ -812,8 +835,8 @@ const STORE_KEY = 'morphz.lang'
 let currentLang = 'en'
 let picked = false
 
-try {
-  const kept = localStorage.getItem(STORE_KEY)
+{
+  const kept = prefGet(STORE_KEY)
   if (STRINGS[kept]) {
     currentLang = kept
     picked = true
@@ -821,7 +844,6 @@ try {
     const nav = navigator.language.slice(0, 2).toLowerCase()
     if (STRINGS[nav]) currentLang = nav
   }
-} catch {
 }
 
 const listeners = []
@@ -833,12 +855,15 @@ export function language() {
 export function setLanguage(id) {
   if (!STRINGS[id] || id === currentLang) return
   currentLang = id
-  try {
-    localStorage.setItem(STORE_KEY, id)
-  } catch {
-  }
+  picked = true
+  prefSet(STORE_KEY, id)
   document.documentElement.lang = id
   for (const fn of listeners) fn(id)
+}
+
+export function reloadLanguage() {
+  const kept = prefGet(STORE_KEY)
+  if (STRINGS[kept]) setLanguage(kept)
 }
 
 export function suggestLanguage(tag) {

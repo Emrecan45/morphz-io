@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import fs from 'fs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 
@@ -9,6 +10,23 @@ const ADAPTERS = {
   crazygames: 'crazygames.js',
   gd: 'gd.js',
   newgrounds: 'none.js',
+  playgama: 'playgama.js',
+}
+
+const EXTRA_FILES = {
+  'playgama.js': ['playgama-bridge-config.json'],
+}
+
+function shipExtras(adapter) {
+  const files = EXTRA_FILES[adapter] || []
+  return {
+    name: 'ship-platform-files',
+    generateBundle() {
+      for (const name of files) {
+        this.emitFile({ type: 'asset', fileName: name, source: fs.readFileSync(path.resolve(root, 'src/platform', name)) })
+      }
+    },
+  }
 }
 
 const REQUIRED = {
@@ -29,6 +47,7 @@ export default defineConfig((config) => {
   }
   return {
     base: './',
+    plugins: [shipExtras(adapter)],
     build: {
       target: 'es2020',
       assetsDir: 'assets',

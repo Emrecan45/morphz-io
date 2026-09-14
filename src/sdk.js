@@ -37,6 +37,26 @@ export function onPortalSettings(fn) {
   portal.onSettingsChange(fn)
 }
 
+export function onPortalPause(fn) {
+  portal.onPause(fn)
+}
+
+export function portalLinksAllowed() {
+  return portal.linksAllowed()
+}
+
+export function portalStorage() {
+  return portal.hasStorage()
+}
+
+export function loadPortalPrefs(keys) {
+  return portal.loadPrefs(keys)
+}
+
+export function savePortalPref(key, value) {
+  portal.savePref(key, value)
+}
+
 export function loadingStart() {
   portal.loadingStart()
 }

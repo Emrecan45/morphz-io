@@ -14,6 +14,17 @@ export function createBase(name) {
       return false
     },
     onSettingsChange() {},
+    onPause() {},
+    linksAllowed() {
+      return true
+    },
+    hasStorage() {
+      return false
+    },
+    loadPrefs() {
+      return Promise.resolve({})
+    },
+    savePref() {},
     hasAds() {
       return false
     },

@@ -10,7 +10,7 @@ fallthrough = true
 [vars]
 MAIL_FROM = "morphz.io <contact@morphz.io>"
 SITE_URL = "https://morphz.io"
-PORTAL_HOSTS = "crazygames.com,y8.com,itch.zone,ungrounded.net,newgrounds.com,gamedistribution.com"
+PORTAL_HOSTS = "crazygames.com,y8.com,itch.zone,ungrounded.net,newgrounds.com,gamedistribution.com,playgama.com,playgama.net"
 
 [[durable_objects.bindings]]
 name = "ARENA_DO"

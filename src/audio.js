@@ -1,4 +1,5 @@
 import musicUrl from './assets/audio/music.ogg'
+import { prefGet, prefSet } from './prefs.js'
 
 const KEY_MUTE = 'morphz.mute'
 const LEVEL = 0.13
@@ -8,19 +9,16 @@ let master = null
 let musicBus = null
 
 function readMuted() {
-  try {
-    return localStorage.getItem(KEY_MUTE) === '1'
-  } catch {
-    return false
-  }
+  return prefGet(KEY_MUTE) === '1'
 }
 
 let muted = readMuted()
+const hushes = new Set()
 
 function applyVolume(instant) {
   if (!ctx) return
   const t = ctx.currentTime
-  const level = muted ? 0 : LEVEL
+  const level = muted || hushes.size ? 0 : LEVEL
   if (instant) {
     musicBus.gain.cancelScheduledValues(t)
     musicBus.gain.value = level
@@ -42,16 +40,36 @@ export function musicMuted() {
   return muted
 }
 
+export function audioSilent() {
+  return muted || hushes.size > 0
+}
+
 export function toggleMute(on) {
   muted = on === undefined ? !muted : !!on
-  try {
-    localStorage.setItem(KEY_MUTE, muted ? '1' : '0')
-  } catch {
-  }
+  prefSet(KEY_MUTE, muted ? '1' : '0')
   applyVolume()
   if (!muted) startMusic()
-  for (const fn of watchers) fn(muted)
+  notify()
   return muted
+}
+
+function notify() {
+  const silent = muted || hushes.size > 0
+  for (const fn of watchers) fn(silent)
+}
+
+export function reloadMute() {
+  const kept = readMuted()
+  if (kept !== muted) toggleMute(kept)
+}
+
+export function hushAudio(on, why) {
+  const key = why || 'host'
+  if (on) hushes.add(key)
+  else hushes.delete(key)
+  applyVolume()
+  if (!muted && !hushes.size) startMusic()
+  notify()
 }
 
 export function unlockAudio() {
