@@ -15,8 +15,10 @@ import { maskSweep } from './hitbox.js'
 import { buildStaticWorld } from './decor.js'
 import { createFood, updateFood, eatAround, scatterLoot } from './food.js'
 import { createZoneState, stepZone } from './zone.js'
+import { VIEW_RADIUS } from '../online.js'
 import {
   createBeingState,
+  wantAttack,
   morphBeingState,
   placeBeingState,
   stepBeingState,
@@ -210,6 +212,11 @@ export function createMatch(mode, options) {
     return power.red < power.blue ? 'red' : 'blue'
   }
 
+  function relocate(b, from) {
+    const avoid = from ? { x: from.x, z: from.z, radius: VIEW_RADIUS } : null
+    placeBeingState(b, ...spawnSafely(b, world, SPAWN.minDistance, SPAWN.attempts, avoid))
+  }
+
   function spawnBeing(b) {
     const [x, z] = spawnSafely(b, world, SPAWN.minDistance, SPAWN.attempts)
     placeBeingState(b, x, z)
@@ -392,10 +399,11 @@ export function createMatch(mode, options) {
 
   function keptOnDeath(b) {
     if (match.mode !== 'team') return 0
-    return Math.max(keptTeamXp(b.xp), Math.min(BOTS.keptCap, Math.floor(b.xp * BOTS.keptXp)))
+    return Math.min(SPAWN.keepCap, keptTeamXp(b.xp))
   }
 
   function respawnBot(b) {
+    let kept = keptOnDeath(b)
     if (match.mode === 'team') {
       const side = balancedSide(b)
       if (side !== b.team) {
@@ -406,10 +414,11 @@ export function createMatch(mode, options) {
         b.nick = botName(fresh, salt, b.family)
         b.robot = robotName(fresh)
         b.name = masked ? b.robot : b.nick
+        b.total = 0
+        kept = 0
         hooks.onRoster()
       }
     }
-    const kept = keptOnDeath(b)
     morphBeingState(b, START)
     b.level = 1
     b.xp = kept
@@ -430,7 +439,7 @@ export function createMatch(mode, options) {
 
   function respawnHuman(b, rebalance) {
     if (rebalance && match.mode === 'team') {
-      const side = balancedSide(b)
+      const side = weakestTeam()
       if (side !== b.team) {
         b.team = side
         hooks.onRoster()
@@ -497,7 +506,7 @@ export function createMatch(mode, options) {
         if (s) {
           const face = s[2] || s[3] ? { x: s[2], z: s[3], snap: true } : null
           stepBeingState(b, dt, s[0], s[1], world, face)
-          if (s[4]) tryAttack(b, world, hooks)
+          if (wantAttack(b, !!s[4], dt)) tryAttack(b, world, hooks)
         } else {
           stepBeingState(b, dt, 0, 0, world, null)
         }
@@ -614,6 +623,7 @@ export function createMatch(mode, options) {
       match.byId.clear()
       let top = 100
       for (const b of world.beings) {
+        const stale = b.seen === false
         b.human = false
         b.input = null
         b.isPlayer = false
@@ -625,6 +635,7 @@ export function createMatch(mode, options) {
         if (b.netId > top) top = b.netId
         match.byId.set(b.netId, b)
         initAi(b)
+        if (stale && b.alive) relocate(b, drop)
       }
       match.counter = top
       world.shots.length = 0

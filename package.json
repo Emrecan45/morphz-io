@@ -9,6 +9,7 @@
     "build:crazygames": "vite build --mode crazygames --outDir dist-crazygames",
     "build:gd": "vite build --mode gd --outDir dist-gd",
     "build:newgrounds": "vite build --mode newgrounds --outDir dist-newgrounds",
+    "build:playgama": "vite build --mode playgama --outDir dist-playgama",
     "preview": "vite preview",
     "server:dev": "wrangler dev",
     "server:deploy": "wrangler deploy"

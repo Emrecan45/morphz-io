@@ -42,6 +42,7 @@ export function createBeingState(defId, name, isPlayer, team) {
     xp: 0,
     tier: def.tier,
     cd: 0,
+    wish: 0,
     bush: null,
     hidden: false,
     veil: 0,
@@ -280,8 +281,14 @@ function fireVolley(b, world, pattern) {
   }
 }
 
+export function wantAttack(b, pressed, dt) {
+  b.wish = pressed ? SHOT.buffer : Math.max(0, b.wish - dt)
+  return b.wish > 0
+}
+
 export function tryAttack(b, world, hooks) {
   if (!b.alive || b.cd > 0) return false
+  b.wish = 0
   const t = b.def.shot
   const pattern = t.pattern || 'bolt'
   b.cd = b.def.cooldown / b.mods.fireRate
@@ -384,7 +391,7 @@ function lonelySpot(b, world, x, z) {
   return near
 }
 
-export function spawnSafely(b, world, minDist, attempts) {
+export function spawnSafely(b, world, minDist, attempts, avoid) {
   let best = null
   let bestScore = -Infinity
   const aimedAt = b.team ? SPAWN.watch : minDist
@@ -403,6 +410,7 @@ export function spawnSafely(b, world, minDist, attempts) {
     }
     let score = b.team ? quietSpot(b, world, x, z) : lonelySpot(b, world, x, z)
     if (spotTaken(world.grid, x, z, b.radius * 2.2)) score = -1e6
+    if (avoid && Math.hypot(avoid.x - x, avoid.z - z) < avoid.radius) score = -1e6
     if (score > bestScore) {
       bestScore = score
       best = [x, z]

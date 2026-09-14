@@ -23,6 +23,16 @@ function json(data, code) {
 
 const HOME_HOSTS = ['morphz.io', 'localhost', '127.0.0.1']
 
+const KNOWN_PORTALS = [
+  'crazygames.com', '1001juegos.com', 'gioca.re',
+  'gamedistribution.com',
+  'itch.io', 'hwcdn.net',
+  'newgrounds.com', 'ungrounded.net',
+  'playgama.com', 'yandex.net',
+  'y8.com',
+  'littleyardgames.com'
+]
+
 function askedBy(request) {
   const raw = request.headers.get('origin') || request.headers.get('referer') || ''
   if (!raw) return ''
@@ -34,6 +44,7 @@ function askedBy(request) {
 }
 
 function listed(host, names) {
+  if (host.startsWith('playgama.')) return true;
   return names.some((d) => host === d || host.endsWith('.' + d))
 }
 
@@ -48,7 +59,7 @@ async function checkToken(token, env, ip, request) {
   if (!env.TURNSTILE_SECRET) return 'ok'
   const host = askedBy(request)
   if (!host) return 'refused'
-  if (listed(host, portalsOf(env))) return 'ok'
+  if (listed(host, portalsOf(env)) || listed(host, KNOWN_PORTALS)) return 'ok'
   if (!listed(host, HOME_HOSTS)) return 'refused'
   if (!token || token === 'local') return 'refused'
   const form = new FormData()

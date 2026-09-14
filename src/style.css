@@ -138,6 +138,11 @@ body:not(.touch) .zone-banner {
   transform-origin: top center;
 }
 
+body:not(.touch) .choice {
+  transform: scale(var(--ui, 1));
+  transform-origin: top left;
+}
+
 .bar {
   position: relative;
   height: 17px;
@@ -592,7 +597,7 @@ body.ready .home .box {
 }
 
 .home.busy .box,
-.home.busy .topbar,
+.home.busy .topbar-side,
 .home.busy .home-footer {
   pointer-events: none;
 }
@@ -825,6 +830,9 @@ body.touch .pad {
   .choice {
     top: auto;
     bottom: 214px;
+  }
+  body:not(.touch) .choice {
+    transform-origin: bottom left;
   }
   .progression {
     bottom: 208px;
@@ -1078,7 +1086,10 @@ body.touch .pad {
 @media (max-width: 760px) {
   .topbar {
     top: 10px;
+    left: 10px;
     right: 10px;
+  }
+  .topbar-side {
     gap: 6px;
   }
 }
@@ -1158,6 +1169,7 @@ body.touch .pad {
 
 body.touch .topbar {
   top: calc(12px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
   right: calc(12px + env(safe-area-inset-right, 0px));
 }
 
@@ -1427,7 +1439,7 @@ body.touch .hud.paused .pause-btn {
 .paused .board,
 .paused .top,
 .paused .compass,
-.hud.paused .zone-banner {
+.hud.paused .zone-banner.active {
   opacity: 0.35;
 }
 
@@ -1485,7 +1497,7 @@ body.touch .hud.paused .pause-btn {
 
 .zbar {
   position: relative;
-  width: 260px;
+  width: min(260px, 18vw);
   height: 15px;
   border-radius: 8px;
   background: rgba(150, 162, 176, 0.3);
@@ -1534,12 +1546,14 @@ body.touch .hud.paused .pause-btn {
 
 
 .compass {
+  --cw: clamp(32px, 7.5vmin, 64px);
+  --ch: calc(var(--cw) * 0.72);
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 64px;
-  height: 46px;
-  margin: -23px 0 0 -32px;
+  width: var(--cw);
+  height: var(--ch);
+  margin: calc(var(--ch) / -2) 0 0 calc(var(--cw) / -2);
   display: none;
   align-items: center;
   justify-content: center;
@@ -1553,8 +1567,8 @@ body.touch .hud.paused .pause-btn {
 }
 
 .compass .arrow {
-  width: 60px;
-  height: 42px;
+  width: calc(var(--cw) * 0.94);
+  height: calc(var(--ch) * 0.91);
   overflow: visible;
   transform-box: border-box;
   transform-origin: 50% 50%;
@@ -1658,10 +1672,19 @@ a.footer-author:hover {
 .topbar {
   position: absolute;
   top: 18px;
+  left: 18px;
   right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.topbar-side {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .pill-wrap {
@@ -2167,7 +2190,10 @@ a.footer-author:hover {
   }
   .topbar {
     top: 10px;
+    left: 10px;
     right: 10px;
+  }
+  .topbar-side {
     gap: 6px;
   }
   .pill {
@@ -2380,4 +2406,10 @@ a.footer-author:hover {
   .adwait-text {
     font-size: 15px;
   }
+}
+
+.pill-tag {
+  margin-left: 7px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
 }

@@ -10,7 +10,7 @@ import logo8 from './assets/logo-8.png'
 import logo9 from './assets/logo-9.png'
 import { CREATURES, ARENA, MODES, TEAMS, UPGRADES, BASES, levelThreshold, treeTint } from './config.js'
 import { t, language, setLanguage, onLanguage, LANGUAGES, creatureName } from './i18n.js'
-import { unlockAudio, toggleMute, musicMuted, onMuteChange } from './audio.js'
+import { unlockAudio, toggleMute, audioSilent, onMuteChange } from './audio.js'
 import { creatureThumb } from './preview.js'
 import { loadProfanity, cleanNickname } from './nickname.js'
 import { attachFooter, closePage, discordButton, helpButton } from './footer.js'
@@ -20,13 +20,15 @@ import { GAME_NAME, VERSION } from './brand.js'
 import { zoneInfo, holdingTeam } from './zoneview.js'
 import { showBanner, clearBanners, bannerState } from './sdk.js'
 import { ZONE } from './config.js'
-import { enterImmersive } from './quality.js'
+import { enterImmersive, chooseTier, qualityTier } from './quality.js'
+import { prefGet, prefSet } from './prefs.js'
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]))
 }
 
 const KEY_MODE = 'morphz.mode'
+const KEY_NAME = 'morphz.name'
 const DOTS = [1, 2, 3, 2]
 const WIDGET_W = 300
 const BOARD_MAX = 10
@@ -43,25 +45,39 @@ const PROMO_WAIT = 3000
 const PROMO_SETTLE = 400
 const PROMO_INTRO = 2500
 
+const GFX_LABEL = { high: 'gfxHigh', floor: 'gfxFloor' }
+
 function topBar(layer) {
   const bar = document.createElement('div')
   bar.className = 'topbar'
+  const lead = document.createElement('div')
+  lead.className = 'topbar-side'
+  const tail = document.createElement('div')
+  tail.className = 'topbar-side'
+  bar.appendChild(lead)
+  bar.appendChild(tail)
 
-  const wrap = document.createElement('div')
-  wrap.className = 'pill-wrap'
-  wrap.innerHTML = `<button class="pill sound" type="button"></button>`
-  bar.appendChild(wrap)
+  lead.appendChild(helpButton(layer))
+  lead.appendChild(discordButton(layer))
+
+  const gfx = document.createElement('button')
+  gfx.type = 'button'
+  gfx.className = 'pill gfx'
+  tail.appendChild(gfx)
 
   const flag = document.createElement('button')
   flag.type = 'button'
   flag.className = 'pill flag'
-  bar.appendChild(flag)
-  bar.appendChild(helpButton(layer))
-  bar.appendChild(discordButton(layer))
+  tail.appendChild(flag)
+
+  const wrap = document.createElement('div')
+  wrap.className = 'pill-wrap'
+  wrap.innerHTML = `<button class="pill sound" type="button"></button>`
+  tail.appendChild(wrap)
 
   const sound = wrap.querySelector('.sound')
   const paintSound = () => {
-    const off = musicMuted()
+    const off = audioSilent()
     sound.innerHTML = iconMarkup(off ? 'musicOff' : 'music', 'pill-ico')
     sound.classList.toggle('off', off)
     sound.title = t(off ? 'musicOffTitle' : 'musicOnTitle')
@@ -75,6 +91,17 @@ function topBar(layer) {
   paintSound()
   bar.dropMute = onMuteChange(paintSound)
 
+  const paintGfx = () => {
+    const label = t(GFX_LABEL[qualityTier()])
+    gfx.innerHTML = iconMarkup('gfx', 'pill-ico') + '<b class="pill-tag">' + label + '</b>'
+    gfx.title = t('graphics') + ' : ' + label
+    gfx.setAttribute('aria-label', gfx.title)
+  }
+  gfx.addEventListener('click', () => {
+    chooseTier(qualityTier() === 'high' ? 'floor' : 'high')
+    paintGfx()
+  })
+
   flag.addEventListener('click', () => {
     const ids = LANGUAGES.map((l) => l.id)
     const at = ids.indexOf(language())
@@ -83,6 +110,7 @@ function topBar(layer) {
 
   bar.applyTexts = () => {
     paintSound()
+    paintGfx()
     const here = LANGUAGES.find((l) => l.id === language())
     flag.innerHTML = flagMarkup(language())
     flag.title = t('language') + ' : ' + (here ? here.name : language())
@@ -134,6 +162,16 @@ function logoMarkup() {
       </div>`
 }
 
+export function reloadMenuPrefs() {
+  const el = document.querySelector('.veil.home')
+  if (!el) return
+  const input = el.querySelector('.nickname')
+  if (input && !input.value) input.value = prefGet(KEY_NAME) || ''
+  const want = prefGet(KEY_MODE) === 'team' ? 'team' : 'solo'
+  const btn = el.querySelector('.mode[data-mode="' + want + '"]')
+  if (btn && !btn.classList.contains('active')) btn.click()
+}
+
 export function createStart(layer, onStart, netApi) {
   const el = document.createElement('div')
   el.className = 'veil home' + (logoSeen ? ' still' : '')
@@ -158,7 +196,7 @@ export function createStart(layer, onStart, netApi) {
   const btn = el.querySelector('.primary')
   const error = el.querySelector('.error')
   const available = !!(netApi && netApi.available)
-  let mode = localStorage.getItem(KEY_MODE) === 'team' ? 'team' : 'solo'
+  let mode = prefGet(KEY_MODE) === 'team' ? 'team' : 'solo'
   loadProfanity()
 
   el.querySelector('.modes').innerHTML = Object.keys(MODES)
@@ -167,7 +205,7 @@ export function createStart(layer, onStart, netApi) {
   el.querySelectorAll('.mode').forEach((b) => {
     b.addEventListener('click', () => {
       mode = b.dataset.mode
-      localStorage.setItem(KEY_MODE, mode)
+      prefSet(KEY_MODE, mode)
       el.querySelectorAll('.mode').forEach((o) => o.classList.toggle('active', o === b))
     })
   })
@@ -261,7 +299,7 @@ export function createStart(layer, onStart, netApi) {
     el.remove()
   }
 
-  input.value = localStorage.getItem('morphz.name') || ''
+  input.value = prefGet(KEY_NAME) || ''
   let busy = false
   let refresh = () => {}
   const shake = () => {
@@ -279,7 +317,7 @@ export function createStart(layer, onStart, netApi) {
       input.focus()
       return
     }
-    localStorage.setItem('morphz.name', verdict.name)
+    prefSet(KEY_NAME, verdict.name)
     enterImmersive()
     busy = true
     el.classList.add('busy')
@@ -484,6 +522,7 @@ export function createHud(layer, cb) {
       choiceTitle: choice.querySelector('.choice-title'),
       resume: el.querySelector('.resume-btn'),
       quitButtons: [...el.querySelectorAll('.quit-btn')],
+      layer,
     },
   }
 
@@ -521,6 +560,56 @@ function statLabel(id) {
 }
 
 const worldPoint = new THREE.Vector3()
+const BLOCKERS = '.board, .skills, .minimap, .zone-banner, .progression, .choice, .pad .base'
+const BLOCK_REFRESH = 400
+const BLOCK_GAP = 6
+const REACH_MIN = 40
+const ARROW_MIN = 32
+const ARROW_MAX = 64
+const ARROW_VMIN = 0.075
+
+function blockBoxes(r, c) {
+  const now = performance.now()
+  if (c.blockBoxes && now - c.blocksAt < BLOCK_REFRESH) return c.blockBoxes
+  c.blocksAt = now
+  c.compassPad = Math.min(ARROW_MAX, Math.max(ARROW_MIN, Math.min(window.innerWidth, window.innerHeight) * ARROW_VMIN)) * 0.5 + BLOCK_GAP
+  const list = []
+  for (const el of r.layer.querySelectorAll(BLOCKERS)) {
+    const box = el.getBoundingClientRect()
+    if (!box.width || !box.height) continue
+    const cs = getComputedStyle(el)
+    if (cs.visibility === 'hidden' || cs.opacity === '0') continue
+    list.push(box)
+  }
+  c.blockBoxes = list
+  return list
+}
+
+function clipReach(ux, uy, reach, boxes, cx, cy, pad) {
+  for (const b of boxes) {
+    let tin = -Infinity
+    let tout = Infinity
+    const x0 = b.left - cx - pad
+    const x1 = b.right - cx + pad
+    const y0 = b.top - cy - pad
+    const y1 = b.bottom - cy + pad
+    if (Math.abs(ux) < 1e-6) {
+      if (x0 > 0 || x1 < 0) continue
+    } else {
+      tin = Math.max(tin, Math.min(x0 / ux, x1 / ux))
+      tout = Math.min(tout, Math.max(x0 / ux, x1 / ux))
+    }
+    if (Math.abs(uy) < 1e-6) {
+      if (y0 > 0 || y1 < 0) continue
+    } else {
+      tin = Math.max(tin, Math.min(y0 / uy, y1 / uy))
+      tout = Math.min(tout, Math.max(y0 / uy, y1 / uy))
+    }
+    if (tin > tout || tout < 0 || tin <= 0) continue
+    if (tin < reach) reach = tin
+  }
+  return Math.max(REACH_MIN, reach)
+}
 
 function updateCompass(r, c, game, p) {
   const z = game.mode === 'team' && game.zones ? game.zones.active : null
@@ -551,11 +640,13 @@ function updateCompass(r, c, game, p) {
     return
   }
 
-  const orbitX = Math.min(w, h) * 0.4
-  const orbitY = Math.max(70, Math.min(orbitX, h * 0.5 - 125))
+  const orbit = Math.min(w, h) * 0.4
   const gap = Math.max(0.001, Math.hypot(px, py))
-  px = (px / gap) * orbitX
-  py = (py / gap) * orbitY
+  const ux = px / gap
+  const uy = py / gap
+  const reach = clipReach(ux, uy, orbit, blockBoxes(r, c), w * 0.5, h * 0.5, c.compassPad)
+  px = ux * reach
+  py = uy * reach
 
   if (c.compass !== true) {
     c.compass = true
@@ -696,7 +787,7 @@ function fitHud(el) {
   if (!tall) return
   const need = tall + BOARD_CHROME + BOARD_MAX * BOARD_ROW + UI_EDGE
   uiFit = Math.max(UI_FLOOR, Math.min(1, window.innerHeight / need))
-  el.style.setProperty('--ui', uiScale().toFixed(3))
+  el.parentElement.style.setProperty('--ui', uiScale().toFixed(3))
   boardCapAt = 0
 }
 

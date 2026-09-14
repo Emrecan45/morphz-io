@@ -8,7 +8,7 @@ import { outlineMaterial, CREATURE_OUTLINE } from './outline.js'
 import { toonMaterial } from './toon.js'
 import { ARENA, ROCKS, TREES, BUSHES, BASES, TEAMS, CAM_PULL } from './config.js'
 import { buildStaticWorld, WALL_COUNT } from './world/decor.js'
-import { QUALITY, LOW } from './quality.js'
+import { QUALITY, renderScale } from './quality.js'
 
 const FOV = 42
 const REF_ASPECT = 16 / 9
@@ -23,13 +23,13 @@ const SEA_LIT = 0x59a6d8
 const SEA_FOAM = 0xc9e6f4
 const SEA_INK = 0x05070b
 const SEA_STROKE = CREATURE_OUTLINE * 0.8
-const SEA_IN = 138
-const SEA_OUT = 200
+const SEA_IN = 97
+const SEA_OUT = 140
 const SEA_LEVEL = -0.55
 const SEA_DIR = [0.6600, 0.7513]
 const SEA_AMP = 1.05
-const SEA_ROWS = LOW ? 20 : 40
-const SEA_COLS = LOW ? 384 : 640
+const SEA_ROWS = QUALITY.seaRows
+const SEA_COLS = QUALITY.seaCols
 
 function makeSky() {
   const geo = new THREE.SphereGeometry(520, 32, 20)
@@ -159,13 +159,16 @@ function seaTone(hex) {
   return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`
 }
 
-function seaRing(rIn, rOut, rows, cols) {
-  const pos = new Float32Array((rows + 1) * (cols + 1) * 3)
-  const idx = new Uint32Array(rows * cols * 6)
+function seaRing(rIn, rOut, rows, cols, from, to) {
+  const head = from || 0
+  const tail = to === undefined ? cols : to
+  const span = tail - head
+  const pos = new Float32Array((rows + 1) * (span + 1) * 3)
+  const idx = new Uint32Array(rows * span * 6)
   let k = 0
   for (let j = 0; j <= rows; j++) {
     const r = rIn + ((rOut - rIn) * j) / rows
-    for (let i = 0; i <= cols; i++) {
+    for (let i = head; i <= tail; i++) {
       const s = (4 * i) / cols
       let x = -1
       let z = -1
@@ -187,9 +190,9 @@ function seaRing(rIn, rOut, rows, cols) {
   }
   let t = 0
   for (let j = 0; j < rows; j++) {
-    for (let i = 0; i < cols; i++) {
-      const a = j * (cols + 1) + i
-      const b = a + cols + 1
+    for (let i = 0; i < span; i++) {
+      const a = j * (span + 1) + i
+      const b = a + span + 1
       idx[t++] = a
       idx[t++] = b
       idx[t++] = a + 1
@@ -280,8 +283,9 @@ const SEA_FIELD = `
   }
 `
 
+const SEA_PARTS = 24
+
 function makeSea() {
-  const geo = seaRing(SEA_IN, SEA_OUT, SEA_ROWS, SEA_COLS)
   const seaTime = { value: 0 }
   const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
   mat.userData.seaTime = seaTime
@@ -334,10 +338,21 @@ function makeSea() {
 
         diffuseColor.rgb = col;`)
   }
-  const mesh = new THREE.Mesh(geo, mat)
-  mesh.position.y = SEA_LEVEL
-  mesh.frustumCulled = false
-  return mesh
+  const g = new THREE.Group()
+  const parts = Math.max(1, Math.min(SEA_PARTS, SEA_COLS))
+  for (let p = 0; p < parts; p++) {
+    const head = Math.round((SEA_COLS * p) / parts)
+    const tail = Math.round((SEA_COLS * (p + 1)) / parts)
+    if (tail <= head) continue
+    const geo = seaRing(SEA_IN, SEA_OUT, SEA_ROWS, SEA_COLS, head, tail)
+    geo.computeBoundingSphere()
+    geo.boundingSphere.radius += SEA_AMP * 2
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.position.y = SEA_LEVEL
+    g.add(mesh)
+  }
+  g.userData.seaTime = seaTime
+  return g
 }
 
 export function stepSea(view, dt) {
@@ -351,41 +366,43 @@ function makeGround(renderer) {
 
   const sea = makeSea()
   g.add(sea)
-  g.userData.seaTime = sea.material.userData.seaTime
+  g.userData.seaTime = sea.userData.seaTime
 
   ARENA.rings.forEach((ring, i) => {
-    const side = ring.to * 2
     const tex = i === 0 ? grain : grain.clone()
     tex.needsUpdate = true
-    tex.repeat.set(side / 26, side / 26)
+    tex.repeat.set(1 / 26, 1 / 26)
     tex.anisotropy = anis
-    const geo = new THREE.PlaneGeometry(side, side)
+    const geo = band(ring.to, ring.from)
     geo.rotateX(-Math.PI / 2)
     const mesh = new THREE.Mesh(geo, toonMaterial({ color: ring.color, map: tex }))
-    mesh.position.y = i * 0.006
     mesh.receiveShadow = true
     g.add(mesh)
   })
   return g
 }
 
-function frame(r, thickness) {
-  const ext = r + thickness
-  const int = r - thickness
+function square(path, r) {
+  path.moveTo(-r, -r)
+  path.lineTo(r, -r)
+  path.lineTo(r, r)
+  path.lineTo(-r, r)
+  path.closePath()
+}
+
+function band(outer, inner) {
   const shape = new THREE.Shape()
-  shape.moveTo(-ext, -ext)
-  shape.lineTo(ext, -ext)
-  shape.lineTo(ext, ext)
-  shape.lineTo(-ext, ext)
-  shape.closePath()
-  const hole = new THREE.Path()
-  hole.moveTo(-int, -int)
-  hole.lineTo(int, -int)
-  hole.lineTo(int, int)
-  hole.lineTo(-int, int)
-  hole.closePath()
-  shape.holes.push(hole)
+  square(shape, outer)
+  if (inner > 0) {
+    const hole = new THREE.Path()
+    square(hole, inner)
+    shape.holes.push(hole)
+  }
   return new THREE.ShapeGeometry(shape)
+}
+
+function frame(r, thickness) {
+  return band(r + thickness, r - thickness)
 }
 
 function makeRingMarks() {
@@ -413,34 +430,40 @@ function makeRingMarks() {
 const LEAVES = 7
 const EMPTY = new THREE.Matrix4().makeScale(0.0001, 0.0001, 0.0001).setPosition(0, -500, 0)
 
+function paintLeaf(set, at, m) {
+  const part = set.meshFor[at]
+  if (!part) return
+  part.setMatrixAt(set.slotFor[at], m)
+  part.instanceMatrix.needsUpdate = true
+}
+
 export function fadeBush(view, bu) {
   const fx = view && view.fx
   if (!fx || fx.current === bu) return
   if (fx.current) {
     for (let j = 0; j < LEAVES; j++) {
       const m = fx.current.mats[j]
-      fx.tufts.setMatrixAt(fx.current.base + j, m)
-      fx.tuftsLine.setMatrixAt(fx.current.base + j, m)
-      fx.tuftsFadedDepth.setMatrixAt(fx.current.base + j, EMPTY)
-      fx.tuftsFaded.setMatrixAt(fx.current.base + j, EMPTY)
-      fx.tuftsFadedLine.setMatrixAt(fx.current.base + j, EMPTY)
+      paintLeaf(fx.leaf, fx.current.base + j, m)
+      paintLeaf(fx.line, fx.current.base + j, m)
     }
   }
   if (bu) {
     for (let j = 0; j < LEAVES; j++) {
-      fx.tufts.setMatrixAt(bu.base + j, EMPTY)
-      fx.tuftsLine.setMatrixAt(bu.base + j, EMPTY)
-      fx.tuftsFadedDepth.setMatrixAt(bu.base + j, bu.mats[j])
-      fx.tuftsFaded.setMatrixAt(bu.base + j, bu.mats[j])
-      fx.tuftsFadedLine.setMatrixAt(bu.base + j, bu.mats[j])
+      paintLeaf(fx.leaf, bu.base + j, EMPTY)
+      paintLeaf(fx.line, bu.base + j, EMPTY)
+      fx.tuftsFadedDepth.setMatrixAt(j, bu.mats[j])
+      fx.tuftsFaded.setMatrixAt(j, bu.mats[j])
+      fx.tuftsFadedLine.setMatrixAt(j, bu.mats[j])
     }
+    fx.tuftsFadedDepth.instanceMatrix.needsUpdate = true
+    fx.tuftsFaded.instanceMatrix.needsUpdate = true
+    fx.tuftsFadedLine.instanceMatrix.needsUpdate = true
   }
+  const shown = bu ? LEAVES : 0
+  fx.tuftsFadedDepth.count = shown
+  fx.tuftsFaded.count = shown
+  fx.tuftsFadedLine.count = shown
   fx.current = bu
-  fx.tufts.instanceMatrix.needsUpdate = true
-  fx.tuftsLine.instanceMatrix.needsUpdate = true
-  fx.tuftsFadedDepth.instanceMatrix.needsUpdate = true
-  fx.tuftsFaded.instanceMatrix.needsUpdate = true
-  fx.tuftsFadedLine.instanceMatrix.needsUpdate = true
 }
 
 export function smoothGeo(geo) {
@@ -476,6 +499,57 @@ function makeWall(stones) {
   return { group: g }
 }
 
+const CHUNK = 34
+
+function chunkPlan(src, count, groupSize) {
+  const m = new THREE.Matrix4()
+  const buckets = new Map()
+  for (let i = 0; i < count; i += groupSize) {
+    src.getMatrixAt(i, m)
+    const y = m.elements[13]
+    const key = y < -100 ? 'vide' : Math.floor(m.elements[12] / CHUNK) + ':' + Math.floor(m.elements[14] / CHUNK)
+    let list = buckets.get(key)
+    if (!list) {
+      list = []
+      buckets.set(key, list)
+    }
+    for (let j = 0; j < groupSize && i + j < count; j++) list.push(i + j)
+  }
+  return [...buckets.values()]
+}
+
+function chunkMeshes(src, plan, count) {
+  const m = new THREE.Matrix4()
+  const meshes = []
+  const meshFor = new Array(count)
+  const slotFor = new Int32Array(count)
+  for (const list of plan) {
+    const part = new THREE.InstancedMesh(src.geometry, src.material, list.length)
+    part.castShadow = src.castShadow
+    part.receiveShadow = src.receiveShadow
+    part.renderOrder = src.renderOrder
+    for (let at = 0; at < list.length; at++) {
+      const g = list[at]
+      src.getMatrixAt(g, m)
+      part.setMatrixAt(at, m)
+      meshFor[g] = part
+      slotFor[g] = at
+    }
+    part.instanceMatrix.needsUpdate = true
+    part.computeBoundingSphere()
+    meshes.push(part)
+  }
+  return { meshes, meshFor, slotFor }
+}
+
+function spread(host, src, count, groupSize, plan) {
+  const cut = plan || chunkPlan(src, count, groupSize)
+  const built = chunkMeshes(src, cut, count)
+  for (const part of built.meshes) host.add(part)
+  built.plan = cut
+  return built
+}
+
 function makeDecor(plan) {
   const g = new THREE.Group()
   const rockGeo = new THREE.DodecahedronGeometry(1, 0)
@@ -490,7 +564,7 @@ function makeDecor(plan) {
   const trunkMat = toonMaterial({ color: 0x7a5330 })
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, TREES.count)
   const trunksLine = new THREE.InstancedMesh(smoothGeo(trunkGeo), outlineMaterial(CREATURE_OUTLINE), TREES.count)
-  const leafGeo = new THREE.IcosahedronGeometry(1, 1)
+  const leafGeo = new THREE.IcosahedronGeometry(1, QUALITY.leaf)
   const leafMat = toonMaterial({ color: 0x2f7550 })
   const leafDepth = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true })
   const leafFade = new THREE.MeshBasicMaterial({
@@ -507,12 +581,15 @@ function makeDecor(plan) {
   outlineFaded.transparent = true
   outlineFaded.depthWrite = false
   outlineFaded.uniforms.alpha.value = 0.92
-  const tuftsFadedDepth = new THREE.InstancedMesh(leafGeo, leafDepth, total)
-  const tuftsFaded = new THREE.InstancedMesh(leafGeo, leafFade, total)
-  const tuftsFadedLine = new THREE.InstancedMesh(smoothGeo(leafGeo), outlineFaded, total)
+  const tuftsFadedDepth = new THREE.InstancedMesh(leafGeo, leafDepth, LEAVES)
+  const tuftsFaded = new THREE.InstancedMesh(leafGeo, leafFade, LEAVES)
+  const tuftsFadedLine = new THREE.InstancedMesh(smoothGeo(leafGeo), outlineFaded, LEAVES)
   tuftsFadedDepth.frustumCulled = false
   tuftsFaded.frustumCulled = false
   tuftsFadedLine.frustumCulled = false
+  tuftsFadedDepth.count = 0
+  tuftsFaded.count = 0
+  tuftsFadedLine.count = 0
   tuftsFadedDepth.renderOrder = 1
   tuftsFaded.renderOrder = 2
   tuftsFadedLine.renderOrder = 3
@@ -575,9 +652,6 @@ function makeDecor(plan) {
       if (!p.ok) d.matrix.copy(EMPTY)
       bushLeaves.setMatrixAt(i * LEAVES + j, d.matrix)
       tuftsLine.setMatrixAt(i * LEAVES + j, d.matrix)
-      tuftsFadedDepth.setMatrixAt(i * LEAVES + j, EMPTY)
-      tuftsFaded.setMatrixAt(i * LEAVES + j, EMPTY)
-      tuftsFadedLine.setMatrixAt(i * LEAVES + j, EMPTY)
     }
     if (p.ok) {
       const bu = plan.bushes.find((o) => o.base === p.base)
@@ -594,14 +668,19 @@ function makeDecor(plan) {
   rocks.receiveShadow = false
   bushLeaves.castShadow = true
   bushLeaves.receiveShadow = true
-  g.add(rocks)
-  g.add(rocksTrait)
-  g.add(tufts)
-  g.add(tuftsTrait)
-  g.add(trunks)
-  g.add(trunksLine)
-  g.add(bushLeaves)
-  g.add(tuftsLine)
+
+  const rockCut = chunkPlan(rocks, ROCKS.count, 1)
+  spread(g, rocks, ROCKS.count, 1, rockCut)
+  spread(g, rocksTrait, ROCKS.count, 1, rockCut)
+  const treeCut = chunkPlan(tufts, TREES.count, 1)
+  spread(g, tufts, TREES.count, 1, treeCut)
+  spread(g, tuftsTrait, TREES.count, 1, treeCut)
+  spread(g, trunks, TREES.count, 1, treeCut)
+  spread(g, trunksLine, TREES.count, 1, treeCut)
+  const leafCut = chunkPlan(bushLeaves, total, LEAVES)
+  const leaf = spread(g, bushLeaves, total, LEAVES, leafCut)
+  const line = spread(g, tuftsLine, total, LEAVES, leafCut)
+
   g.add(tuftsFadedDepth)
   g.add(tuftsFaded)
   g.add(tuftsFadedLine)
@@ -610,7 +689,7 @@ function makeDecor(plan) {
     group: g,
     blocks,
     bushes,
-    fx: { tufts: bushLeaves, tuftsLine, tuftsFadedDepth, tuftsFaded, tuftsFadedLine, current: null },
+    fx: { leaf, line, tuftsFadedDepth, tuftsFaded, tuftsFadedLine, current: null },
   }
 }
 
@@ -643,18 +722,26 @@ export function makeBases() {
   return g
 }
 
+export function freezeStatic(node) {
+  node.updateMatrixWorld(true)
+  node.traverse((o) => {
+    o.matrixAutoUpdate = false
+  })
+  return node
+}
+
 export function createView(canvas, statics) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: QUALITY.antialias, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(QUALITY.pixelRatio, window.devicePixelRatio || 1))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.NeutralToneMapping
   renderer.toneMappingExposure = 1
-  renderer.shadowMap.enabled = true
+  renderer.shadowMap.enabled = QUALITY.shadowMap > 0
   renderer.shadowMap.type = QUALITY.softShadow ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap
 
   const scene = new THREE.Scene()
   scene.fog = new THREE.FogExp2(0xd6e7d2, 0.0034)
-  scene.add(makeSky())
+  scene.add(freezeStatic(makeSky()))
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.4, 900)
 
@@ -663,8 +750,8 @@ export function createView(canvas, statics) {
 
   const sun = new THREE.DirectionalLight(0xfff3d8, 2.3)
   sun.position.set(26, 58, 20)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(QUALITY.shadowMap, QUALITY.shadowMap)
+  sun.castShadow = QUALITY.shadowMap > 0
+  sun.shadow.mapSize.set(QUALITY.shadowMap || 512, QUALITY.shadowMap || 512)
   sun.shadow.camera.near = 12
   sun.shadow.camera.far = 110
   sun.shadow.camera.left = -QUALITY.shadowSpan
@@ -682,12 +769,12 @@ export function createView(canvas, statics) {
   scene.add(fill)
 
   const ground = makeGround(renderer)
-  scene.add(ground)
-  scene.add(makeRingMarks())
+  scene.add(freezeStatic(ground))
+  scene.add(freezeStatic(makeRingMarks()))
   const plan = statics || buildStaticWorld()
-  scene.add(makeWall(plan.wall.stones).group)
+  scene.add(freezeStatic(makeWall(plan.wall.stones).group))
   const decor = makeDecor(plan.decor)
-  scene.add(decor.group)
+  scene.add(freezeStatic(decor.group))
 
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: QUALITY.samples })
   const composer = new EffectComposer(renderer, target)
@@ -706,6 +793,47 @@ export function fovFor(aspect) {
   const half = FOV_HALF * Math.min(1, REF_ASPECT / aspect)
   const fov = (Math.atan(half) * 360) / Math.PI
   return Math.min(75, Math.max(12, fov))
+}
+
+export function applyQuality(view) {
+  const q = QUALITY
+  const r = view.renderer
+  const ratio = Math.min(q.pixelRatio, window.devicePixelRatio || 1) * renderScale()
+  r.setPixelRatio(ratio)
+  view.composer.setPixelRatio(ratio)
+  view.bloom.enabled = q.bloom
+  const wantShadow = q.shadowMap > 0
+  const wantType = q.softShadow ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap
+  if (r.shadowMap.enabled !== wantShadow || r.shadowMap.type !== wantType) {
+    r.shadowMap.enabled = wantShadow
+    r.shadowMap.type = wantType
+    view.scene.traverse((o) => {
+      if (!o.isMesh && !o.isInstancedMesh) return
+      const list = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []
+      for (const m of list) m.needsUpdate = true
+    })
+  }
+  view.sun.castShadow = wantShadow
+  if (view.sun.shadow.mapSize.x !== q.shadowMap && wantShadow) {
+    if (view.sun.shadow.map) {
+      view.sun.shadow.map.dispose()
+      view.sun.shadow.map = null
+    }
+    view.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap)
+  }
+  view.sun.shadow.radius = q.softShadow ? 3 : 1
+  const cam = view.sun.shadow.camera
+  cam.left = -q.shadowSpan
+  cam.right = q.shadowSpan
+  cam.top = q.shadowSpan
+  cam.bottom = -q.shadowSpan
+  cam.updateProjectionMatrix()
+  resizeView(view)
+}
+
+export function paintView(view) {
+  if (view.bloom.enabled) view.composer.render()
+  else view.renderer.render(view.scene, view.camera)
 }
 
 export function resizeView(view) {
