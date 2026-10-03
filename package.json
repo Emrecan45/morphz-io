@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "vite": "^6.0.0",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.147.0"
   },
   "allowScripts": {
     "workerd@1.20260820.1": true
