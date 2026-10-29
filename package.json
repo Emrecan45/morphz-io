@@ -12,10 +12,12 @@
     "build:playgama": "vite build --mode playgama --outDir dist-playgama",
     "preview": "vite preview",
     "server:dev": "wrangler dev",
-    "server:deploy": "wrangler deploy"
+    "server:deploy": "wrangler deploy",
+    "server:node": "node server/node.js"
   },
   "dependencies": {
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "vite": "^6.0.0",

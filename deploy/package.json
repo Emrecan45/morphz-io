@@ -1,0 +1,11 @@
+{
+  "name": "morphz-arena",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/node.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

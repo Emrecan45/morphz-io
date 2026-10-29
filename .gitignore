@@ -7,3 +7,4 @@ dist-*
 .wrangler
 .dev.vars
 admin
+deploy/morphz-arena.tgz

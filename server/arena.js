@@ -143,11 +143,8 @@ export class Arena {
     if (request.headers.get('upgrade') !== 'websocket') {
       return new Response('websocket attendu', { status: 426 })
     }
-    const mode = url.searchParams.get('mode') === 'team' ? 'team' : 'solo'
-    const watcher = url.searchParams.get('watch') === '1'
-    if (watcher && (!this.match || this.humanCount() === 0)) return new Response('no match running', { status: 409 })
-    this.startLoop(mode)
-    if (!watcher && this.humanCount() >= BOTS.population) return new Response('room full', { status: 503 })
+    const refused = this.admit(url)
+    if (refused) return new Response(refused.message, { status: refused.status })
 
     const pair = new WebSocketPair()
     const client = pair[0]
@@ -155,6 +152,15 @@ export class Arena {
     server.accept()
     this.attachSocket(server)
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  admit(url) {
+    const mode = url.searchParams.get('mode') === 'team' ? 'team' : 'solo'
+    const watcher = url.searchParams.get('watch') === '1'
+    if (watcher && (!this.match || this.humanCount() === 0)) return { status: 409, message: 'no match running' }
+    this.startLoop(mode)
+    if (!watcher && this.humanCount() >= BOTS.population) return { status: 503, message: 'room full' }
+    return null
   }
 
   startLoop(mode) {
